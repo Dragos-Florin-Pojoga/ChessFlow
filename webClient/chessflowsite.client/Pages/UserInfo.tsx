@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import AuthorizeView from "../Components/AuthorizeView.js";
 import NavBar from "../Components/NavBar.js";
 import { getToken } from "../Utils/authToken.ts";
-
+import UserStore from '../stores/UserStore.ts';
 
 function UserInfo() {
     const param = useParams();
@@ -11,12 +11,18 @@ function UserInfo() {
     const [elo, setElo] = useState(1200);
     const [name1, setName1] = useState("");
 
+    const { user, setUser } = UserStore();
+
     console.log(param);
     const username = param.username;
 
     const token = getToken();
 
     console.log(token);
+
+    const handleReportClick = () => {
+        alert("TO DO: Implement reporting");
+    }
 
     useEffect(() => {
 
@@ -46,10 +52,20 @@ function UserInfo() {
                 <>
                     <h2>Username: {name1}</h2>
                     <h2>Elo: {elo}</h2>
+                    <br></br>
+                    <div>
+                        {
+                            (user.name === name1) ?
+                                <></>
+                                :
+                                <button type="button" onClick={handleReportClick}>Report!</button>
+                        }
+                    </div>
                 </>
                 :
-                <h1>User doesn't exist!</h1>}
-        </AuthorizeView>
+                <h1>User doesn't exist!</h1>
+            }
+        </AuthorizeView >
     );
 }
 

@@ -55,11 +55,13 @@ export default defineConfig({
                 target,
                 secure: false,
                 changeOrigin: true
-            },
-        port: parseInt(env.DEV_SERVER_PORT || '60252'),
-        https: {
-            key: fs.readFileSync(keyFilePath),
-            cert: fs.readFileSync(certFilePath),
+            }
+        },
+            port: parseInt(env.DEV_SERVER_PORT || '60252'),
+            https: {
+                key: fs.readFileSync(keyFilePath),
+                cert: fs.readFileSync(certFilePath),
+            }
         }
-    }
+    
 })
