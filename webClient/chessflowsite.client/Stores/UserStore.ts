@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 interface User {
     email: string;
+    name: string;
 }
 
 interface UserStore {
@@ -11,9 +12,9 @@ interface UserStore {
 }
 
 const useUserStore = create<UserStore>((set) => ({
-    user: { email: '' },
+    user: { email: '', name: '' },
     setUser: (user) => set({ user }),
-    clearUser: () => set({ user: { email: '' } }),
+    clearUser: () => set({ user: { email: '', name: '' } }),
 }));
 
 export default useUserStore;

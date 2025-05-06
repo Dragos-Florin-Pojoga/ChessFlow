@@ -1,6 +1,7 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useNavigate, Navigate } from "react-router-dom";
 import UserStore from '../stores/UserStore.ts';
+import { getToken } from "../Utils/authToken.ts";
 function Login() {
     const { setUser } = UserStore();
 
@@ -13,6 +14,9 @@ function Login() {
     const [errors, setErrors] = useState<string[]>([]);
     const navigate = useNavigate();
 
+    //check if user is already logged in
+    const [logged, setLogged] = useState<boolean>(false);
+
     // handle change events for input fields
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -24,6 +28,8 @@ function Login() {
     const handleRegisterClick = () => {
         navigate("/register");
     }
+
+
 
     const setError = (e: string) => setErrors([e]);
 
@@ -59,8 +65,21 @@ function Login() {
                         } else {
                             sessionStorage.setItem("token", token);
                         }
-                        setError("Registration successful.");
-                        setUser({ email: email });
+                        setError("Login successful.");
+
+                        fetch("/api/account/pingauth", {
+                            method: "GET",
+                            headers: {
+                                Authorization: `Bearer ${token}`,
+                                "Content-Type": "application/json",
+                            }
+                        }).then(async (response) => {
+                            if (response.status == 200) {
+                                let j: any = await response.json();
+                                setUser({ email: j.email, name: j.name });
+                            }
+                            else setError("Store error.")
+                        });
                         navigate("/");
                     }
                     else if (response.status === 401) {
@@ -81,57 +100,81 @@ function Login() {
         }
     };
 
+    useEffect(() => {
+        let token = getToken();
+        if (token === null) {
+            token = "";
+        }
+        fetch("/api/account/pingauth", {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+            }
+        }).then((response) => {
+            if (response.status === 200) setLogged(true);
+            else setLogged(false);
+        });
+    }, []);
+
     return (
-        <div className="containerbox">
-            <h3>Login</h3>
-            <form onSubmit={handleSubmit}>
-                <div>
-                    <label className="forminput" htmlFor="email">Email:</label>
-                </div>
-                <div>
-                    <input
-                        type="email"
-                        id="email"
-                        name="email"
-                        value={email}
-                        onChange={handleChange}
-                    />
-                </div>
-                <div>
-                    <label htmlFor="password">Password:</label>
-                </div>
-                <div>
-                    <input
-                        type="password"
-                        id="password"
-                        name="password"
-                        value={password}
-                        onChange={handleChange}
-                    />
-                </div>
-                <div>
-                    <input
-                        type="checkbox"
-                        id="rememberme"
-                        name="rememberme"
-                        checked={!!rememberme}
-                        onChange={handleChange} /><span>Remember Me</span>
-                </div>
-                <div>
-                    <button type="submit">Login</button>
-                </div>
-                <div>
-                    <button type="button" onClick={handleRegisterClick}>Register</button>
-                </div>
-            </form>
-            {errors.length > 0 && (
-                <div className="error">
-                    {errors.map((err, index) => (
-                        <p key={index}>{err}</p>
-                    ))}
-                </div>
-            )}
-        </div>
+        <>
+            {
+                logged ?
+                <Navigate to="/"></Navigate>
+                :
+            <div className="containerbox">
+                <h3>Login</h3>
+                <form onSubmit={handleSubmit}>
+                    <div>
+                        <label className="forminput" htmlFor="email">Email:</label>
+                    </div>
+                    <div>
+                        <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            value={email}
+                            onChange={handleChange}
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="password">Password:</label>
+                    </div>
+                    <div>
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            value={password}
+                            onChange={handleChange}
+                        />
+                    </div>
+                    <div>
+                        <input
+                            type="checkbox"
+                            id="rememberme"
+                            name="rememberme"
+                            checked={!!rememberme}
+                            onChange={handleChange} /><span>Remember Me</span>
+                    </div>
+                    <div>
+                        <button type="submit">Login</button>
+                    </div>
+                    <div>
+                        <button type="button" onClick={handleRegisterClick}>Register</button>
+                    </div>
+                </form>
+                {errors.length > 0 && (
+                    <div className="error">
+                        {errors.map((err, index) => (
+                            <p key={index}>{err}</p>
+                        ))}
+                    </div>
+                )}
+            </div>
+            }
+        </>
     );
 }
 

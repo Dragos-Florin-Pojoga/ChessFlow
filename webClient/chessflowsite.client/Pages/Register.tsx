@@ -8,6 +8,7 @@ function Register() {
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [elo, setElo] = useState(1200);
+    const [name1, setName1] = useState("");
     const navigate = useNavigate();
 
     // state variable for error messages
@@ -26,6 +27,7 @@ function Register() {
         if (name === "email") setEmail(value);
         if (name === "password") setPassword(value);
         if (name === "confirmPassword") setConfirmPassword(value);
+        if (name === "name") setName1(value);
     };
 
     // handle change event for the ELO select dropdown
@@ -55,7 +57,8 @@ function Register() {
                 body: JSON.stringify({
                     email: email,
                     password: password,
-                    elo: elo
+                    elo: elo,
+                    name: name1
                 }),
             })
                 .then(async (response) => {
@@ -110,6 +113,16 @@ function Register() {
                         id="confirmPassword"
                         name="confirmPassword"
                         value={confirmPassword}
+                        onChange={handleChange}
+                    />
+                </div>
+                <div>
+                    <label htmlFor="name">Username: </label></div><div>
+                    <input
+                        type="name"
+                        id="name"
+                        name="name"
+                        value={name1}
                         onChange={handleChange}
                     />
                 </div>

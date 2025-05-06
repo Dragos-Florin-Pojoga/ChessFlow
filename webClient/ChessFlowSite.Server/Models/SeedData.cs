@@ -48,7 +48,8 @@ namespace ChessFlowSite.Server.Models
                         Email = "admin@test.com",
                         NormalizedUserName = "ADMIN@TEST.COM",
                         PasswordHash = hasher.HashPassword(null, "Pass1!"),
-                        Elo = 1000
+                        Elo = 1000,
+                        Name = "Admin"
                     },
                     new ApplicationUser
 
@@ -62,7 +63,8 @@ namespace ChessFlowSite.Server.Models
                         Email = "user1@test.com",
                         NormalizedUserName = "USER1@TEST.COM",
                         PasswordHash = hasher.HashPassword(null, "User1!"),
-                        Elo = 857
+                        Elo = 857,
+                        Name = "User1"
                     },
                     new ApplicationUser
 
@@ -75,7 +77,8 @@ namespace ChessFlowSite.Server.Models
                         Email = "user2@test.com",
                         NormalizedUserName = "USER2@TEST.COM",
                         PasswordHash = hasher.HashPassword(null, "User1!"),
-                        Elo = 1015
+                        Elo = 1015,
+                        Name = "User2"
                     },
                     new ApplicationUser
 
@@ -88,7 +91,8 @@ namespace ChessFlowSite.Server.Models
                         Email = "cheater@test.com",
                         NormalizedUserName = "CHEATER@TEST.COM",
                         PasswordHash = hasher.HashPassword(null, "User1!"),
-                        Elo = 1500
+                        Elo = 1500,
+                        Name = "Cheater"
                     },
                     new ApplicationUser
 
@@ -101,7 +105,8 @@ namespace ChessFlowSite.Server.Models
                         Email = "accused@test.com",
                         NormalizedUserName = "ACCUSED@TEST.COM",
                         PasswordHash = hasher.HashPassword(null, "User1!"),
-                        Elo = 1400
+                        Elo = 1400,
+                        Name = "Accused"
                     }
                 );
 

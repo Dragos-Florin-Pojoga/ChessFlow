@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import UserStore from '../stores/UserStore.ts';
+import { getToken } from "../Utils/authToken.ts";
 
 interface User {
     email: string;
@@ -26,10 +27,6 @@ function AuthorizeView(props: { children: React.ReactNode }) {
             return new Promise((resolve) => setTimeout(resolve, delay));
         }
 
-        function getToken(): string | null {
-            return localStorage.getItem("token") || sessionStorage.getItem("token");
-        }
-
         const token = getToken();
 
         if (!token) {
@@ -50,7 +47,7 @@ function AuthorizeView(props: { children: React.ReactNode }) {
                 if (response.status == 200) {
                     console.log("Authorized");
                     let j: any = await response.json();
-                    setUser({ email: j.email });
+                    setUser({ email: j.email, name: j.name });
                     setAuthorized(true);
                     return response; // return the response
                 } else if (response.status == 401) {
@@ -125,8 +122,31 @@ export function AuthorizedUser(props: { value: string }) {
     // Display the username in a h1 tag
     if (props.value == "email")
         return <>{user.email}</>;
+    else if (props.value == "name")
+        return <>{user.name}</>;
     else
         return <></>
+}
+
+export function UpdateUserInfo(token: string | null) {
+    const { user, setUser } = UserStore();
+
+    if (token == null) return false;
+
+    fetch("/api/account/pingauth", {
+        method: "GET",
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+        }
+    }).then(async (response) => {
+        if (response.status == 200) {
+            let j: any = await response.json();
+            setUser({ email: j.email, name: j.name });
+            return true;
+        }
+        else return false;
+    });
 }
 
 export default AuthorizeView;

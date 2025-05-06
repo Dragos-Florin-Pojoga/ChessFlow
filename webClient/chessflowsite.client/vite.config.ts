@@ -51,23 +51,11 @@ export default defineConfig({
                 target,
                 secure: false
             },
-            '^/api/account/pingauth': {
+            '/api': {
                 target,
-                secure: false
+                secure: false,
+                changeOrigin: true
             },
-            '^/api/account/register': {
-                target,
-                secure: false
-            },
-            '^/api/account/login': {
-                target,
-                secure: false
-            },
-            '^/api/account/logout': {
-                target,
-                secure: false
-            }
-        },
         port: parseInt(env.DEV_SERVER_PORT || '60252'),
         https: {
             key: fs.readFileSync(keyFilePath),
