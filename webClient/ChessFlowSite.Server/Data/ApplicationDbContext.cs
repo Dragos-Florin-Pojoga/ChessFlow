@@ -23,9 +23,9 @@ namespace ReactApp1.Server.Data
             builder.Entity<ApplicationUser>().HasIndex(u => u.Name).IsUnique();
 
             builder.Entity<Report>()
-            .HasOne(b => b.Reporter)
+            .HasOne(b => b.Reported)
             .WithMany(u => u.ReportsIssued)
-            .HasForeignKey(b => b.ReporterId)
+            .HasForeignKey(b => b.ReportedId)
             .OnDelete(DeleteBehavior.Restrict);
 
             builder.Entity<Report>()

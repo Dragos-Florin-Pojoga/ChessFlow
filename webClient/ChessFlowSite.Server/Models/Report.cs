@@ -7,8 +7,8 @@ namespace ChessFlowSite.Server.Models
         [Key]
         public int Id { get; set; }
         [Required(ErrorMessage = "Reported is required")]
-        public string ReporterId { get; set; }
-        public virtual ApplicationUser? Reporter { get; set; }
+        public string ReportedId { get; set; }
+        public virtual ApplicationUser? Reported { get; set; }
         [Required(ErrorMessage = "Reportee is required")]
         public string ReporteeId { get; set; }
         public virtual ApplicationUser? Reportee {  get; set; }

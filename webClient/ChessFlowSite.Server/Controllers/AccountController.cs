@@ -140,7 +140,7 @@ namespace ChessFlowSite.Server.Controllers
             return Results.Json(new { email = email, name = name, banned = isBanned });
         }
         [HttpGet("user/{username}")]
-        //[Authorize]
+        [Authorize]
         public async Task<IResult> GetInfo(string username)
         {
             ApplicationUser user = _db.ApplicationUsers.FirstOrDefault(x => x.Name == username);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import AuthorizeView from "../Components/AuthorizeView.js";
 import NavBar from "../Components/NavBar.js";
 import { getToken } from "../Utils/authToken.ts";
@@ -11,6 +11,8 @@ function UserInfo() {
     const [elo, setElo] = useState(1200);
     const [name1, setName1] = useState("");
 
+    const navigate = useNavigate();
+
     const { user, setUser } = UserStore();
 
     console.log(param);
@@ -21,7 +23,7 @@ function UserInfo() {
     console.log(token);
 
     const handleReportClick = () => {
-        alert("TO DO: Implement reporting");
+        navigate(`/report/${username}`);
     }
 
     useEffect(() => {

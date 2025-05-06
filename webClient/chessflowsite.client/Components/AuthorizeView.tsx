@@ -75,7 +75,7 @@ function AuthorizeView(props: { children: React.ReactNode }) {
                         
                     }
                     console.log("Authorized");
-                    setUser({ email: j.email, name: j.name });
+                    setUser({ email: data.email, name: data.name });
                     setAuthorized(true);
                     return response; // return the response
                 } else if (response.status == 401) {
