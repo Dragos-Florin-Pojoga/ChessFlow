@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import UserStore from '../stores/UserStore.ts';
 import { getToken } from "../Utils/authToken.ts";
+import Banned from '../Components/Banned.tsx';
 function Login() {
     const { setUser } = UserStore();
 
@@ -10,12 +11,14 @@ function Login() {
     const [email, setEmail] = useState<string>("");
     const [password, setPassword] = useState<string>("");
     const [rememberme, setRememberme] = useState<boolean>(false);
-    // state variable for error messages
+    // state variable for error messages (and also other messages)
     const [errors, setErrors] = useState<string[]>([]);
     const navigate = useNavigate();
 
     //check if user is already logged in
     const [logged, setLogged] = useState<boolean>(false);
+    //check if user is banned
+    const [banned, setBanned] = useState<boolean>(false);
 
     // handle change events for input fields
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -54,33 +57,43 @@ function Login() {
                 }),
             })
                 .then(async (response) => {
-                    console.log(response)
+                    console.log(response);
                     if (response.ok) {
                         const data = await response.json();
                         console.log(data);
-                        const token = data.token;
-                        console.log(token);
-                        if (rememberme) {
-                            localStorage.setItem("token", token);
-                        } else {
-                            sessionStorage.setItem("token", token);
+                        if (data.banned) {
+                            if (data.permaban) setError("You're permabanned!");
+                            else {
+                                let date = new Date(data.bannedUntil+"Z");
+                                setError(`You're banned until ${date.toString()}!`);
+                            }
+                            setBanned(true);
                         }
-                        setError("Login successful.");
+                        else {
+                            const token = data.token;
+                            console.log(token);
+                            if (rememberme) {
+                                localStorage.setItem("token", token);
+                            } else {
+                                sessionStorage.setItem("token", token);
+                            }
 
-                        fetch("/api/account/pingauth", {
-                            method: "GET",
-                            headers: {
-                                Authorization: `Bearer ${token}`,
-                                "Content-Type": "application/json",
-                            }
-                        }).then(async (response) => {
-                            if (response.status == 200) {
-                                let j: any = await response.json();
-                                setUser({ email: j.email, name: j.name });
-                            }
-                            else setError("Store error.")
-                        });
-                        navigate("/");
+                            fetch("/api/account/pingauth", {
+                                method: "GET",
+                                headers: {
+                                    Authorization: `Bearer ${token}`,
+                                    "Content-Type": "application/json",
+                                }
+                            }).then(async (response) => {
+                                if (response.status == 200) {
+                                    let j: any = await response.json();
+                                    setUser({ email: j.email, name: j.name });
+                                }
+                                else setError("Store error.")
+                            });
+                            setError("Login successful.");
+                            navigate("/");
+                        }
                     }
                     else if (response.status === 401) {
                         const data = await response.json();
@@ -116,6 +129,16 @@ function Login() {
             else setLogged(false);
         });
     }, []);
+
+    if (banned) return (
+        <Banned>{errors.length > 0 && (
+            <div className="error">
+                {errors.map((err, index) => (
+                    <p key={index}>{err}</p>
+                ))}
+            </div>
+        )}</Banned>
+    );
 
     return (
         <>

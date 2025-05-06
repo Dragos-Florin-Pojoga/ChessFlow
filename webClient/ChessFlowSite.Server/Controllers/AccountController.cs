@@ -34,7 +34,7 @@ namespace ChessFlowSite.Server.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            if (_db.Users.Any(u => u.Name == model.Name)) {
+            if (_db.ApplicationUsers.Any(u => u.Name == model.Name)) {
                 return BadRequest(new {errors = new[] { new { code = "UsernameTaken", description = "Username is already taken" } } });
             }
 
@@ -61,6 +61,41 @@ namespace ChessFlowSite.Server.Controllers
             var user = await _userManager.FindByEmailAsync(model.Email);
             if (user == null || !await _userManager.CheckPasswordAsync(user, model.Password))
                 return Unauthorized(new { Message = "Invalid credentials" });
+
+            var isBanned = user.isBanned;
+
+            if (isBanned) {
+                bool permaban = _db.Bans.Where(b => b.BannedId == user.Id && b.BannedUntil == null).Any();
+                if (permaban)
+                {
+                    return Ok(new
+                    {
+                        banned = true,
+                        permaban = permaban
+                    });
+                }
+                else {
+                    var latestTempBan = _db.Bans.Where(b => b.BannedId == user.Id && !b.Permanent && b.BannedUntil != null).OrderByDescending(b => b.BannedUntil).FirstOrDefault();
+                    if (latestTempBan != null)
+                    {
+                        return Ok(new
+                        {
+                            banned = true,
+                            permaban = permaban,
+                            bannedUntil = latestTempBan.BannedUntil
+                        });
+                    }
+                    else {
+                        //temp, for testing, shouldn't happen in production (if the user is banned they *do* have a ban)
+                        return Ok(new
+                        {
+                            banned = true,
+                            permaban = permaban,
+                            bannedUntil = DateTime.Parse("12/12/2030")
+                        });
+                    }
+                }
+            }
 
 
             await _signInManager.SignInAsync(user, isPersistent: false);
@@ -101,20 +136,22 @@ namespace ChessFlowSite.Server.Controllers
             var user = await _userManager.GetUserAsync(User);
             var email = user.Email;
             var name = user.Name;
-            return Results.Json(new { email = email, name = name });
+            var isBanned = user.isBanned;
+            return Results.Json(new { email = email, name = name, banned = isBanned });
         }
         [HttpGet("user/{username}")]
         //[Authorize]
         public async Task<IResult> GetInfo(string username)
         {
-            ApplicationUser user = _db.Users.FirstOrDefault(x => x.Name == username);
+            ApplicationUser user = _db.ApplicationUsers.FirstOrDefault(x => x.Name == username);
             if (user == null)
                 return Results.NotFound(new { Message = "User not found" });
 
             return Results.Json(new
             {
                 name =user.Name,
-                elo = user.Elo
+                elo = user.Elo,
+                banned = user.isBanned,
             });
         }
 

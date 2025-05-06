@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import UserStore from '../stores/UserStore.ts';
-import { getToken } from "../Utils/authToken.ts";
+import { getToken, clearToken } from "../Utils/authToken.ts";
 
 interface User {
     email: string;
@@ -13,7 +13,10 @@ function AuthorizeView(props: { children: React.ReactNode }) {
     const [authorized, setAuthorized] = useState<boolean>(false);
     const [loading, setLoading] = useState<boolean>(true); // add a loading state
 
-    const { user, setUser } = UserStore();
+    //check if user is banned
+    const [banned, setBanned] = useState<boolean>(false);
+
+    const { user, setUser, clearUser } = UserStore();
 
 
     useEffect(() => {
@@ -45,8 +48,33 @@ function AuthorizeView(props: { children: React.ReactNode }) {
 
                 // check the status code
                 if (response.status == 200) {
+                    let data = await response.json();
+                    if (data.banned) {
+                        clearToken();
+                        fetch("/api/account/logout", {
+                            method: "POST",
+                            headers: {
+                                Authorization: `Bearer ${token}`,
+                                "Content-Type": "application/json",
+                            },
+                            body: ""
+
+                        })
+                            .then((data) => {
+                                if (data.ok) {
+                                    setBanned(true);
+                                    clearUser();
+                                    return response;
+                                }
+
+
+                            })
+                            .catch((error) => {
+                                console.error(error);
+                            })
+                        
+                    }
                     console.log("Authorized");
-                    let j: any = await response.json();
                     setUser({ email: j.email, name: j.name });
                     setAuthorized(true);
                     return response; // return the response
@@ -89,8 +117,14 @@ function AuthorizeView(props: { children: React.ReactNode }) {
             });
     }, []);
 
-
-    if (loading) {
+    if (banned) {
+        return (
+            <>
+                <Navigate to="/" />
+            </>
+        );   
+    }
+    else if (loading) {
         return (
             <>
                 <p>Loading...</p>
