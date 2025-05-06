@@ -144,7 +144,7 @@ impl Bitboard {
     
     
     #[inline]
-    pub fn count_set_bits(self) -> u32 {
+    pub fn popcount(self) -> u32 {
         self.0.count_ones()
     }
 

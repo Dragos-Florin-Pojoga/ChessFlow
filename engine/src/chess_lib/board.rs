@@ -508,7 +508,11 @@ impl fmt::Display for Board {
                             (PieceType::King, Color::Black) => 'k',
                             (PieceType::Pawn, Color::Black) => 'p',
                         };
-                        write!(f, "{} ", piece_char)?;
+                        // write!(f, "{} ", piece_char)?;
+                        match color {
+                            Color::Black => write!(f, "\x1b[1;34m{}\x1b[0m ", piece_char)?,
+                            Color::White => write!(f, "\x1b[1;31m{}\x1b[0m ", piece_char)?,
+                        }
                     }
                     None => {
                         write!(f, ". ")?; // Represent empty squares

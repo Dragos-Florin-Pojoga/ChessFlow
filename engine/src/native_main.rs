@@ -4,29 +4,66 @@ use chess_lib::*;
 use std::io::{self, BufRead};
 
 
-fn main() {
-    let mut board = Board::new_start_pos();
-    let mut legal_moves = board.generate_legal_moves();
-
-    println!("{}", board);
-
-    let stdin = io::stdin();
-    for maybe_line in stdin.lock().lines() {
-        match maybe_line {
-            Ok(line) => {
-                let mv = parse_move_string(&line).unwrap();
-                if legal_moves.contains(&mv) {
-                    board = board.make_move(&mv);
-                    legal_moves = board.generate_legal_moves();
-                    println!("{}\nlegal moves available:{}\n\n", board, legal_moves.len());
-                }
-            }
-            Err(err) => {
-                eprintln!("error reading stdin: {}", err);
-                break;
-            }
+fn count_promotion_moves(moves: &Vec<ChessMove>) -> usize {
+    let mut promotion_count = 0;
+    for mv in moves {
+        if mv.promotion.is_some() {
+            promotion_count += 1;
         }
     }
+    promotion_count
+}
+
+use std::time::Instant;
+
+fn main() {
+    let mut board = Board::new_start_pos();
+    // let fen = "7k/5K2/8/8/8/8/6Q1/8 w - - 0 1".parse::<Fen>().unwrap(); let mut board = Board::from_fen(&fen).unwrap();
+    let mut legal_moves = board.generate_legal_moves();
+
+    println!("{}\nlegal moves available:{}\t\teval:{}\t\tpromo:{}\nGame state:{:?}\n\n", board, legal_moves.len(), board.evaluate(0), count_promotion_moves(&legal_moves), board.check_game_state());
+
+
+    let start = Instant::now();
+
+    let mut cnt = 0;
+    while board.check_game_state() == GameState::Ongoing {
+        cnt += 1;
+        if cnt == 20 {
+            // break;
+        }
+        let cpu = board.find_best_move(3).unwrap();
+        board = board.make_move(&cpu);
+        legal_moves = board.generate_legal_moves();
+        println!("{}\nlegal moves available:{}\t\teval:{}\t\tpromo:{}\nGame state:{:?}\n\n", board, legal_moves.len(), board.evaluate(0), count_promotion_moves(&legal_moves), board.check_game_state());
+    }
+
+    let duration = start.elapsed();
+
+    println!("took: {} ms", duration.as_millis());
+
+    // let stdin = io::stdin();
+    // for maybe_line in stdin.lock().lines() {
+    //     match maybe_line {
+    //         Ok(line) => {
+    //             let mv = parse_move_string(&line).unwrap();
+    //             if legal_moves.contains(&mv) {
+    //                 board = board.make_move(&mv);
+    //                 legal_moves = board.generate_legal_moves();
+    //                 println!("{}\nlegal moves available:{}\t\teval:{}\nGame state:{:?}\n\n", board, legal_moves.len(), board.evaluate(), board.check_game_state());
+                    
+    //                 let cpu = board.find_best_move(1).unwrap();
+    //                 board = board.make_move(&cpu);
+    //                 legal_moves = board.generate_legal_moves();
+    //                 println!("{}\nlegal moves available:{}\t\teval:{}\nGame state:{:?}\n\n", board, legal_moves.len(), board.evaluate(), board.check_game_state());
+    //             }
+    //         }
+    //         Err(err) => {
+    //             eprintln!("error reading stdin: {}", err);
+    //             break;
+    //         }
+    //     }
+    // }
 }
 
 // fn main() {
