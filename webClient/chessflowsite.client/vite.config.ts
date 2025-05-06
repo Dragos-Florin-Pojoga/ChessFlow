@@ -50,6 +50,22 @@ export default defineConfig({
             '^/weatherforecast': {
                 target,
                 secure: false
+            },
+            '^/api/account/pingauth': {
+                target,
+                secure: false
+            },
+            '^/api/account/register': {
+                target,
+                secure: false
+            },
+            '^/api/account/login': {
+                target,
+                secure: false
+            },
+            '^/api/account/logout': {
+                target,
+                secure: false
             }
         },
         port: parseInt(env.DEV_SERVER_PORT || '60252'),

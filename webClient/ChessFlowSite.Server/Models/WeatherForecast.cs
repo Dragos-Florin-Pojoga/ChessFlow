@@ -1,4 +1,4 @@
-namespace ChessFlowSite.Server
+namespace ChessFlowSite.Server.Models
 {
     public class WeatherForecast
     {
