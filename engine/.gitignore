@@ -1,0 +1,5 @@
+target
+public/pkg
+
+# I know this should be in the repo but it can cause some unexpected bugs on nightly
+Cargo.lock
