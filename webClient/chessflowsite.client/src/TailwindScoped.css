@@ -1,0 +1,4 @@
+.tailwind-page {
+    @tailwind components;
+    @tailwind utilities;
+}
