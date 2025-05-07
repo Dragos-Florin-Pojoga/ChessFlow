@@ -9,6 +9,7 @@ import Unauthorized from '../Pages/Unauthorized.tsx';
 import UserInfo from '../Pages/UserInfo.tsx';
 import Report from '../Pages/Report.tsx';
 import ReportShow from '../Pages/ReportShow.tsx';
+import UserShow from '../Pages/UserShow.tsx';
 function App() {
 
 
@@ -20,6 +21,7 @@ function App() {
                 <Route path="/unauthorized" element={<Unauthorized/> } />
                 <Route path="/admin" element={<AdminPanel />} />
                 <Route path="/admin/reports" element={<ReportShow />} />
+                <Route path="/users" element={<UserShow />} />
                 <Route path="/user/:username" element={<UserInfo />} />
                 <Route path="/report/:username" element={<Report />} />
                 <Route path="/" element={<Home />} />

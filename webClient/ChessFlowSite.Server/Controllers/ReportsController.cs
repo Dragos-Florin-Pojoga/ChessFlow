@@ -60,9 +60,9 @@ namespace ChessFlowSite.Server.Controllers
             await _db.SaveChangesAsync();
             return Ok();
         }
-        [HttpGet("show")]
+        [HttpGet("index")]
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> Show([FromQuery] ShowModel model)
+        public async Task<IActionResult> Index([FromQuery] ReportIndexModel model)
         {
             if (model.Page <= 0 || model.PageSize <= 0)
                 return BadRequest(new { errors = new[] { new { code = "InvalidPagination", description = "Page and pageSize must be greater than zero." } } });
@@ -78,8 +78,6 @@ namespace ChessFlowSite.Server.Controllers
             {
                 query = query.Where(r => r.Reported.Name == model.ReportedName);
             }
-
-            Console.WriteLine("\n\n!!!!!!!!!!!!\n" + model.SortType + " " + model.IsAscending + "\n!!!!!!!!!!!!\n");
 
             // Sorting
             query = (model.SortType.ToLower(), model.IsAscending) switch
@@ -107,7 +105,8 @@ namespace ChessFlowSite.Server.Controllers
                     reporteeName  = r.Reportee?.Name,
                     gameID = r.GameId,
                     reason = r.Reason,
-                    created = r.Created
+                    created = r.Created,
+                    reportedBanned = r.Reported?.isBanned
                 })
             };
 
@@ -123,7 +122,7 @@ public class ReportModel
     public string Reason { get; set; }
 }
 
-public class ShowModel
+public class ReportIndexModel
 {
     public string? ReportedName { get; set; }
     public int Page { get; set; } = 1;

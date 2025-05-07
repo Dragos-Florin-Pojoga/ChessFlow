@@ -13,8 +13,8 @@ function ReportShow() {
     const [reportedName, setReportedName] = useState('');
     const [sortType, setSortType] = useState('id');
     const [isAscending, setIsAscending] = useState<boolean>(false);
-    const [page, setPage] = useState(10);
-    const [pageSize] = useState(1);
+    const [page, setPage] = useState(1);
+    const [pageSize] = useState(10);
     const [lastPage, setlastPage] = useState(0);
 
     //temp values for storing inputed but not submitted fields when changing page
@@ -46,7 +46,7 @@ function ReportShow() {
 
         console.log(params.toString());
 
-        const response = await fetch(`/api/reports/show?${params.toString()}`, {
+        const response = await fetch(`/api/reports/index?${params.toString()}`, {
             method: "GET",
             headers: {
                 Authorization: `Bearer ${token}`
@@ -129,6 +129,7 @@ function ReportShow() {
                                     <th className="border px-2 py-1">Game ID</th>
                                     <th className="border px-2 py-1">Reason</th>
                                     <th className="border px-2 py-1">Date created</th>
+                                    <th className="border px-2 py-1"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -147,6 +148,14 @@ function ReportShow() {
                                             <td className="border px-2 py-1">{r.gameID ?? 'N/A'}</td>
                                             <td className="border px-2 py-1">{r.reason}</td>
                                             <td className="border px-2 py-1">{r.created}</td>
+                                            <td className="border px-2 py-1">
+                                                {
+                                                    r.reportedBanned ?
+                                                        <div className="warning">User is already banned!</div>
+                                                        :
+                                                        <span><a href="#" onClick={() => navigate(`/ban/${r.reportedName}?reportID=${r.reportID}`)}>Create ban</a></span>
+                                                }
+                                            </td>
                                         </tr>
                                     ))
                                 )}

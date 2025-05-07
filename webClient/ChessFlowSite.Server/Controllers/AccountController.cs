@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using ReactApp1.Server.Data;
 using System.IdentityModel.Tokens.Jwt;
@@ -155,6 +156,81 @@ namespace ChessFlowSite.Server.Controllers
             });
         }
 
+        [HttpGet("index")]
+        [Authorize]
+        public async Task<IActionResult> Index([FromQuery] UserIndexModel model)
+        {
+            if (model.Page <= 0 || model.PageSize <= 0)
+                return BadRequest(new { errors = new[] { new { code = "InvalidPagination", description = "Page and pageSize must be greater than zero." } } });
+
+            var query = _db.ApplicationUsers
+                .Include(u => u.GamesAsWhite)
+                .Include(u => u.GamesAsBlack)
+                .AsQueryable();
+
+            // Sorting
+            bool sortByGames = model.SortType.ToLower() == "games"; //since Games is notMapped/computed I can't actually query it so gotta treat it seperately
+
+            List<ApplicationUser> users;
+
+            if (sortByGames)
+            {
+                // Client-side sorting
+                users = await query.ToListAsync();
+
+                users = model.IsAscending
+                    ? users.OrderBy(u => u.Games.Count).ToList()
+                    : users.OrderByDescending(u => u.Games.Count).ToList();
+
+                // Pagination
+                users = users
+                    .Skip((model.Page - 1) * model.PageSize)
+                    .Take(model.PageSize)
+                    .ToList();
+            }
+            else {
+                query = (model.SortType.ToLower(), model.IsAscending) switch
+                {
+                    ("elo", true) => query.OrderBy(u => u.Elo),
+                    ("elo", false) => query.OrderByDescending(u => u.Elo),
+                    ("id", true) => query.OrderBy(u => u.Id),
+                    _ => query.OrderByDescending(u => u.Id), // Default
+                };
+
+                // Pagination
+                users = await query
+                    .Skip((model.Page - 1) * model.PageSize)
+                    .Take(model.PageSize)
+                    .ToListAsync();
+            }
+            var totalItems = await query.CountAsync();
+            var lastPage = Math.Ceiling((double)totalItems / model.PageSize);
+
+            var adminRoleId = await _db.Roles
+                .Where(r => r.Name == "Admin")
+                .Select(r => r.Id)
+                .FirstOrDefaultAsync();
+
+            var userAdminIds = await _db.UserRoles
+                .Where(ur => ur.RoleId == adminRoleId)
+                .Select(ur => ur.UserId)
+                .ToListAsync();
+
+            var result = new
+            {
+                lastPage = lastPage,
+                items = users.Select(u => new {
+                    name = u.Name,
+                    elo = u.Elo,
+                    games = u.Games.Count,
+                    banned = u.isBanned,
+                    isAdmin = userAdminIds.Contains(u.Id)
+                })
+            };
+
+            return Ok(result);
+        }
+
     }
 }
 
@@ -173,3 +249,12 @@ public class RegModel
     
     public int Elo { get; set; }
 }
+
+public class UserIndexModel
+{
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 10;
+    public string? SortType { get; set; }
+    public bool IsAscending { get; set; } = false;
+}
+
