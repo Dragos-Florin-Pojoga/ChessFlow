@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WASM Parse test</title>
+</head>
+<body>
+    <input type="text" id="userInput" placeholder="Enter some text">
+    <button id="submit">Process</button>
+    <button id="all">Run All</button>
+
+    <pre id="output"></pre>
+
+    <script type="module">
+        import { createEngineWorker } from '/public/engine.js';
+
+        const engine = createEngineWorker();
+
+        function logToPage(message) {
+            const output = document.getElementById('output');
+            output.innerHTML += message;
+            output.innerHTML += "\n";
+        }
+
+        async function captureConsoleLog(fn) {
+            const originalLog = console.log;
+            const logs = [];
+            console.log = (...args) => {
+                logs.push(args.join(' '));
+                originalLog.apply(console, args);
+            };
+            try {
+                await fn();
+            } finally {
+                console.log = originalLog;
+            }
+            return logs;
+        }
+
+        async function run() {
+            document.getElementById('submit').addEventListener('click', async () => {
+                const input = document.getElementById('userInput').value;
+                try {
+                    logToPage(await captureConsoleLog(async () => {
+                        console.log("Parsing:", input, "\n");
+                        const result = await engine.process_string(input);
+                        console.log("Processed result:", result);
+                    }));
+                } catch (err) {
+                    console.error("Error from engine:", err);
+                }
+            });
+
+
+            await new Promise(r => setTimeout(r, 400));
+
+            const inputs = [
+                "go",
+                "position startpos",
+                "position startpos moves",
+                "position startpos moves e1e2",
+                "position startpos moves e1e2 e2e3",
+                "position fen rnbqkbnr/ppp1pppp/8/8/2PpP3/5P2/PP1P2PP/RNBQKBNR b KQkq c3 0 3",
+                "uci",
+                "isready",
+                "ucinewgame",
+                "stop",
+                "quit",
+                "setoption name NaMe value VaL",
+            ];
+            for(const input of inputs) {
+                try {
+                    logToPage(await captureConsoleLog(async () => {
+                        console.log("Parsing:", input, "\n");
+                        const result = await engine.process_string(input);
+                        console.log("Processed result:", result);
+                    }));
+                } catch (err) {
+                    console.error("Error from engine:", err);
+                }
+            }
+        }
+
+        run();
+
+    </script>
+</body>
+</html>

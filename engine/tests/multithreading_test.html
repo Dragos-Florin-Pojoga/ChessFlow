@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WASM multithreading test</title>
+</head>
+<body>
+    <h1>For multithreading test, reload and watch the console</h1>
+
+    <script type="module">
+        import { createEngineWorker } from '/public/engine.js';
+
+        const engine = createEngineWorker();
+        await new Promise(r => setTimeout(r, 400));
+
+        await engine.multithreading_test_stage_one();
+
+        const interval = setInterval(async () => {
+            await engine.multithreading_test_stage_two();
+        }, 1000);
+
+        setTimeout(() => {
+            clearInterval(interval);
+        }, 1000 * 16);
+
+    </script>
+</body>
+</html>

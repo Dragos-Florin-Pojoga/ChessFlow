@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Testpage</title>
+    <style>
+        .iframe-container {
+            display: flex;
+            width: 100vw;
+            height: 50vh;
+        }
+
+        .iframe-container iframe {
+            flex: 1;
+            border: none;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <script>
+        console.log(self.crossOriginIsolated);
+        console.log(typeof SharedArrayBuffer);
+    </script>
+    <div class="iframe-container">
+        <iframe src="/tests/automated_response_tests.html" frameborder="0"></iframe>
+        <iframe src="/tests/interactive_parse_test.html" frameborder="0"></iframe>
+    </div>
+    <div class="iframe-container">
+        <iframe src="/tests/multithreading_test.html" frameborder="0"></iframe>
+    </div>
+</body>
+</html>
