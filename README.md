@@ -8,3 +8,5 @@
 # User Stories [here](https://github.com/Dragos-Florin-Pojoga/ChessFlow/issues?q=label%3A%22User%20Story%22%20)
 
 # Backlog [here](https://github.com/users/Dragos-Florin-Pojoga/projects/1)
+
+# Development process checklist [here](/docs/README.md)
