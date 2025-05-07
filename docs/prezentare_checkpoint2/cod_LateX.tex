@@ -1,0 +1,235 @@
+\documentclass{beamer}
+
+% --------------- PACHETE UTILE ---------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[romanian]{babel}
+\usepackage{graphicx}
+\usepackage{amsmath, amssymb}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{fontawesome5} % Pentru \faGithub
+
+% --------------- TEMA ȘI CULORI ---------------
+\usetheme{Madrid} 
+
+% --------------- INFORMAȚII DESPRE PREZENTARE ---------------
+\title[ChessFlow]{ChessFlow: O Platformă Modernă de Șah Online}
+\subtitle{Proiect de Echipă}
+\author[Fugulin, Păcurariu, Pojoga]{Fugulin Victor \and Păcurariu Răzvan Mihai \and Pojoga Dragoș-Florin}
+\institute[FMI - Info]
+% \logo{\includegraphics[height=1cm]{logo_upb.png}} % Adaugă logo dacă ai
+
+\date{\today}
+
+% --------------- ÎNCEPUTUL DOCUMENTULUI ---------------
+\begin{document}
+
+% ----- SLIDE-UL DE TITLU -----
+\begin{frame}
+    \titlepage
+\end{frame}
+
+% ----- SLIDE-UL DE CUPRINS -----
+\begin{frame}
+    \frametitle{Cuprins}
+    \tableofcontents % Se generează automat pe baza secțiunilor
+\end{frame}
+
+% --------------- SECȚIUNEA 1: IDEEA PROIECTULUI ---------------
+\section{Ideea Proiectului}
+
+\begin{frame}
+    \frametitle{Conceptul ChessFlow}
+    \begin{itemize}
+        \item \textbf{Viziune:} Dezvoltarea unei platforme web moderne pentru jocul de șah online, inspirată de Lichess.
+        \item \textbf{Obiective principale:}
+        \begin{itemize}
+            \item Interfață utilizator (UI) intuitivă și experiență de joc (UX) fluidă.
+            \item Motor de șah (Engine) performant.
+            \item Game Master (GM) pentru logica și arbitrarea jocului.
+            \item Arhitectură scalabilă și modulară.
+        \end{itemize}
+        \item \textbf{Realizări cheie până acum:}
+        \begin{itemize}
+            \item Sistem de autentificare (Login/Register).
+            \item Nucleul motorului de șah (generare mutări, evaluare, căutare Alpha-Beta).
+            \item Baze pentru Game Master (management timp).
+        \end{itemize}
+    \end{itemize}
+\end{frame}
+
+% --------------- SECȚIUNEA 2: ARHITECTURA ---------------
+\section{Arhitectura Sistemului}
+
+\begin{frame}
+    \frametitle{Arhitectura Generală ChessFlow}
+    \begin{figure}
+        \centering
+        \includegraphics[height=0.6\textwidth, width=0.9\textwidth
+                  ]{DiagramaChessFlow.png}
+        \caption{Componentele principale și fluxul de date.}
+    \end{figure}
+\end{frame}
+
+\begin {frame}
+ \textbf{Componente principale:}
+    \begin{itemize}
+        \item \textbf{Frontend Web (UI):} Interfața vizuală cu utilizatorul.
+        \item \textbf{Backend Web (API):} Gestiune utilizatori, matchmaking, API joc.
+        \item \textbf{Game Master (GM):} Logica de joc, validări, comunicare cu Engine-ul.
+        \item \textbf{Chess Engine:} Calcul mutări, analiză poziții (comunicare via UCI).
+        \item \textbf{Bază de Date:} Stocare persistentă.
+    \end{itemize}
+\end {frame}
+
+\begin{frame}
+\begin{figure}
+\centering
+\includegraphics[width=0.8\textwidth, keepaspectratio
+                  ]{UsecaseChessFlow.png}
+        \caption{Use case Diagram.}
+\end{figure}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Tehnologii Utilizate}
+    \begin{columns}[T] % Aliniere la top
+        \begin{column}{0.5\textwidth}
+            \textbf{Web Frontend \& Backend:}
+            \begin{itemize}
+                \item Interfață utilizator: \textbf{React}
+                \item API & Logică server: \textbf{ASP.NET Core (C\#)}
+                \item Comunicare: API RESTful
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.5\textwidth}
+            \textbf{Game Engine \& Game Master:}
+            \begin{itemize}
+                \item Limbaj: \textbf{Rust} (pentru performanță și siguranță)
+                \item Protocol comunicare Engine: UCI
+            \end{itemize}
+        \end{column}
+    \end{columns}
+    \vfill
+    \textbf{Alte Tehnologii și Unelte:}
+    \begin{itemize}
+        \item Bază de date: \textbf{SQLite}
+        \item Versionare cod: Git, \textbf{GitHub}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \begin{figure}
+        \centering
+        \includegraphics[height=0.6\textwidth, width=0.9\textwidth
+                  ]{ChessFlowDB.png}
+        \caption{Diagrama ER}
+    \end{figure}
+\end{frame}
+
+% --------------- SECȚIUNEA 3: ASPECTE TEHNICE INTERESANTE ȘI/SAU DIFICILE ---------------
+\section{Aspecte Tehnice Relevante}
+
+\begin{frame}
+    \frametitle{Provocări în Dezvoltarea Engine-ului (Rust)}
+    \begin{itemize}
+        \item \textbf{Reprezentarea Eficientă a Tablei (Bitboards):}
+        \begin{itemize}
+            \item Operații rapide pe biți pentru generarea și validarea mutărilor.
+            \item Curba de învățare și complexitatea implementării corecte.
+        \end{itemize}
+        \item \textbf{Algoritmi de Căutare Optimizată (Minimax cu Alpha-Beta Pruning):}
+        \begin{itemize}
+            \item Reducerea drastică a spațiului de căutare în arborele de joc.
+            \item Necesită o implementare atentă pentru a evita erorile subtile.
+        \end{itemize}
+        \item \textbf{Securizarea Comunicației cu JWT între ASP.NET și Rust:}
+        \begin{itemize}
+            \item Asigurarea unei validări consistente a token-urilor și a politicilor de autorizare între ecosistemul .NET (C\#) și cel Rust.
+            \item Depanarea problemelor de generare/validare a token-urilor între cele două platforme cu biblioteci și implementări diferite.
+        \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Provocări: Integrare și Game Master (Rust & ASP.NET)}
+    \begin{itemize}
+        \item \textbf{Comunicarea Inter-Proces (Backend API $\leftrightarrow$ Game Master $\leftrightarrow$ Engine):}
+        \begin{itemize}
+            \item Asigurarea unei comunicări eficiente și robuste (ex: gRPC, mesagerie, TCP/IP pentru UCI).
+            \item Gestionarea stării partidelor distribuite pe multiple componente.
+        \end{itemize}
+        \item \textbf{Logica Complexă a Game Master-ului:}
+        \begin{itemize}
+            \item Validarea tuturor regulilor de șah (rocadă, en-passant, remize etc.).
+            \item Management precis al timpului și al condițiilor de final de joc.
+        \end{itemize}
+        \item \textbf{Scalabilitate și Performanță:}
+        \begin{itemize}
+            \item Proiectarea sistemului pentru a gestiona un număr mare de jocuri concurente.
+        \end{itemize}
+    \end{itemize}
+\end{frame}
+
+% --------------- SECȚIUNEA 4: CE MAI AVEȚI DE IMPLEMENTAT ---------------
+\section{Planuri de Viitor}
+
+\begin{frame}
+    \frametitle{Direcții Principale de Dezvoltare}
+    \begin{itemize}
+        \item \textbf{Finalizarea Interfeței Utilizator (React):}
+        \begin{itemize}
+            \item Afișare tablă interactivă (drag & drop, evidențiere mutări).
+            \item Istoric mutări, timer live, opțiuni de joc.
+        \end{itemize}
+        \item \textbf{Extinderea Funcționalităților de Joc (Backend \& GM):}
+        \begin{itemize}
+            \item Matchmaking (găsire oponenți, mod guest).
+            \item Sistem de ranking (ELO).
+            \item Suport pentru diferite formate de timp.
+        \end{itemize}
+        \item \textbf{Optimizarea și Îmbunătățirea Engine-ului (Rust):}
+        \begin{itemize}
+            \item Iterative deepening, opening books, endgame tablebases.
+            \item Testare și rafinare continuă a funcției de evaluare.
+        \end{itemize}
+        \item \textbf{Infrastructură și Testare Riguroasă:}
+        \begin{itemize}
+            \item Implementare CI/CD pipelines.
+            \item Teste unitare, de integrare și UI/UX.
+            \item Documentație și panou de administrare.
+        \end{itemize}
+    \end{itemize}
+\end{frame}
+
+% ----- SLIDE-UL DE CONCLUZII (OPȚIONAL, DAR RECOMANDAT) -----
+\begin{frame}
+    \frametitle{Concluzii}
+    \begin{itemize}
+        \item Am pus bazele solide pentru ChessFlow, cu un motor de șah funcțional și un sistem de autentificare.
+        \item Am ales tehnologii moderne (React, ASP.NET, Rust) pentru performanță și scalabilitate.
+        \item Provocările tehnice abordate demonstrează complexitatea proiectului.
+        \item Următorii pași se concentrează pe dezvoltarea UI, funcționalități de joc complete și robustețe.
+    \end{itemize}
+    \vfill
+    \begin{center}
+        \textit{Suntem entuziasmați să continuăm dezvoltarea ChessFlow!}
+    \end{center}
+\end{frame}
+
+% ----- SLIDE-UL DE MULȚUMIRI / ÎNTREBĂRI-----
+\begin{frame}
+    \frametitle{Mulțumiri și Întrebări}
+    \begin{center}
+        \Huge Vă mulțumim pentru atenție!
+        \vspace{1cm} \\
+        Întrebări?
+        \vspace{0.5cm} \\
+    \end{center}
+    \begin{center}
+        \faGithub \hspace{0.2em} \texttt{https://github.com/Dragos-Florin-Pojoga/ChessFlow}
+    \end{center}
+\end{frame}
+
+\end{document}
