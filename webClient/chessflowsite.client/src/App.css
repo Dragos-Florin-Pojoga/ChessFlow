@@ -1,8 +1,15 @@
-﻿#root {
+﻿/*@import "tailwindcss";*/
+
+#root {
     max-width: 1280px;
     margin: 0 auto;
     padding: 2rem;
     text-align: center;
+}
+
+table {
+    margin-left: auto;
+    margin-right: auto;
 }
 
 th, td {
@@ -61,5 +68,9 @@ body,
 #test {
     width: fit-content;
     margin: 0 auto;
+}
+
+.warning {
+    color: #ff0000;
 }
 

@@ -10,6 +10,7 @@ function UserInfo() {
     const [exists, setExists] = useState(false);
     const [elo, setElo] = useState(1200);
     const [name1, setName1] = useState("");
+    const [banned, setBanned] = useState<boolean>(false);
 
     const navigate = useNavigate();
 
@@ -43,6 +44,7 @@ function UserInfo() {
                     setName1(data.name);
                     setElo(data.elo);
                     setExists(true);
+                    setBanned(data.banned);
                 }
             });
     }, [username]);
@@ -57,6 +59,9 @@ function UserInfo() {
                     <br></br>
                     <div>
                         {
+                            banned ?
+                                <div className="warning">User is banned!</div>
+                            :
                             (user.name === name1) ?
                                 <></>
                                 :

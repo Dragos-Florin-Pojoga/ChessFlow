@@ -75,7 +75,7 @@ function Report() {
                     <>
                         <NavBar></NavBar>
                         <div className="containerbox">
-                            <h3>Login</h3>
+                            <h3>Report menu</h3>
                             <form onSubmit={handleSubmit} name="form">
                                 <div>
                                     <label className="forminput" htmlFor="content">Reason:</label>

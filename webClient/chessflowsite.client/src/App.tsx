@@ -8,6 +8,7 @@ import AdminPanel from '../Pages/AdminPanel.tsx';
 import Unauthorized from '../Pages/Unauthorized.tsx';
 import UserInfo from '../Pages/UserInfo.tsx';
 import Report from '../Pages/Report.tsx';
+import ReportShow from '../Pages/ReportShow.tsx';
 function App() {
 
 
@@ -18,6 +19,7 @@ function App() {
                 <Route path="/register" element={<Register />} />
                 <Route path="/unauthorized" element={<Unauthorized/> } />
                 <Route path="/admin" element={<AdminPanel />} />
+                <Route path="/admin/reports" element={<ReportShow />} />
                 <Route path="/user/:username" element={<UserInfo />} />
                 <Route path="/report/:username" element={<Report />} />
                 <Route path="/" element={<Home />} />

@@ -20,5 +20,7 @@ namespace ChessFlowSite.Server.Models
          MinLength(1, ErrorMessage = "Reason must be at least 1 character"),
          MaxLength(511, ErrorMessage = "Content cannot be longer than 511 characters.")]
         public string Reason { get; set; }
+
+        public DateTime Created { get; set; } = DateTime.UtcNow;
     }
 }

@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using ReactApp1.Server.Data;
 
 namespace ChessFlowSite.Server.Controllers
@@ -59,6 +60,59 @@ namespace ChessFlowSite.Server.Controllers
             await _db.SaveChangesAsync();
             return Ok();
         }
+        [HttpGet("show")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Show([FromQuery] ShowModel model)
+        {
+            if (model.Page <= 0 || model.PageSize <= 0)
+                return BadRequest(new { errors = new[] { new { code = "InvalidPagination", description = "Page and pageSize must be greater than zero." } } });
+
+            var query = _db.Reports
+                .Include(r => r.Reported)
+                .Include(r => r.Reportee)
+                .Include(r => r.Game)
+                .AsQueryable();
+
+            // Filtering
+            if (!string.IsNullOrWhiteSpace(model.ReportedName))
+            {
+                query = query.Where(r => r.Reported.Name == model.ReportedName);
+            }
+
+            Console.WriteLine("\n\n!!!!!!!!!!!!\n" + model.SortType + " " + model.IsAscending + "\n!!!!!!!!!!!!\n");
+
+            // Sorting
+            query = (model.SortType.ToLower(), model.IsAscending) switch
+            {
+                ("date", true) => query.OrderBy(r => r.Created),
+                ("date", false) => query.OrderByDescending(r => r.Created),
+                ("id", true) => query.OrderBy(r => r.Id),
+                _ => query.OrderByDescending(r => r.Id), // Default
+            };
+
+            // Pagination
+            var totalItems = await query.CountAsync();
+            var lastPage = Math.Ceiling((double)totalItems / model.PageSize);
+            var reports = await query
+                .Skip((model.Page - 1) * model.PageSize)
+                .Take(model.PageSize)
+                .ToListAsync();
+
+            var result = new
+            {
+                lastPage = lastPage,
+                items = reports.Select(r => new {
+                    reportID = r.Id,
+                    reportedName = r.Reported?.Name,
+                    reporteeName  = r.Reportee?.Name,
+                    gameID = r.GameId,
+                    reason = r.Reason,
+                    created = r.Created
+                })
+            };
+
+            return Ok(result);
+        }
     }
 }
 public class ReportModel
@@ -67,4 +121,13 @@ public class ReportModel
     public string ReporteeName{ get; set; }
     public int? GameId { get; set; }
     public string Reason { get; set; }
+}
+
+public class ShowModel
+{
+    public string? ReportedName { get; set; }
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 10;
+    public string? SortType { get; set; }
+    public bool IsAscending { get; set; } = false;
 }

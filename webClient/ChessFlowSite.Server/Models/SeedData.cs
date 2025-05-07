@@ -92,7 +92,8 @@ namespace ChessFlowSite.Server.Models
                         NormalizedUserName = "CHEATER@TEST.COM",
                         PasswordHash = hasher.HashPassword(null, "User1!"),
                         Elo = 1500,
-                        Name = "Cheater"
+                        Name = "Cheater",
+                        isBanned = true
                     },
                     new ApplicationUser
 
