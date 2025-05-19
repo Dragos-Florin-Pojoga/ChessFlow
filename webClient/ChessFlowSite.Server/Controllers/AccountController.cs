@@ -1,10 +1,12 @@
 ﻿using ChessFlowSite.Server.Models;
+using ChessFlowSite.Server.Swagger.Examples;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using ReactApp1.Server.Data;
+using Swashbuckle.AspNetCore.Filters;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -30,6 +32,7 @@ namespace ChessFlowSite.Server.Controllers
         }
 
         [HttpPost("register")]
+        [SwaggerRequestExample(typeof(RegModel), typeof(RegModelExample))]
         public async Task<IActionResult> Register([FromBody] RegModel model)
         {
             if (!ModelState.IsValid)
@@ -57,6 +60,7 @@ namespace ChessFlowSite.Server.Controllers
         }
 
         [HttpPost("login")]
+        [SwaggerRequestExample(typeof(AuthModel), typeof(AuthModelExample))]
         public async Task<IActionResult> Login([FromBody] AuthModel model)
         {
             var user = await _userManager.FindByEmailAsync(model.Email);

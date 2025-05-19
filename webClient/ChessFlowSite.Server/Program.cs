@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using ReactApp1.Server.Data;
+using Swashbuckle.AspNetCore.Filters;
 using System.Security.Claims;
 using System.Text;
 
@@ -67,7 +68,12 @@ namespace ChessFlowSite.Server
                         new string[]{ }
                     }
                 });
+                option.SwaggerDoc("v1", new OpenApiInfo { Title = "ChessFlow WebAPI", Version = "v1" });
+
+                option.ExampleFilters();
             });
+            builder.Services.AddSwaggerExamplesFromAssemblyOf<Program>();
+
             builder.Services.AddAuthorization();
             builder.Services.AddIdentityApiEndpoints<ApplicationUser>().AddRoles<IdentityRole>().AddEntityFrameworkStores<ApplicationDbContext>();
 
