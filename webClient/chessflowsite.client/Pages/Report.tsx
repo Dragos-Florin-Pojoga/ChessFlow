@@ -53,7 +53,7 @@ function Report() {
             }).then(async (response) => {
                 console.log(response);
                 if (response.ok) {
-                    setError("Reported succesfully");
+                    setError("Reported successfully");
                     //navigate("/");
                 }
                 else {

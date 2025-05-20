@@ -78,3 +78,9 @@ body,
     color: #00ffff;
 }
 
+.unstyled {
+    color: inherit;
+    text-decoration: inherit;
+    cursor: inherit;
+}
+

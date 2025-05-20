@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using ReactApp1.Server.Data;
 using Swashbuckle.AspNetCore.Filters;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -91,13 +92,9 @@ namespace ChessFlowSite.Server.Controllers
                         });
                     }
                     else {
-                        //temp, for testing, shouldn't happen in production (if the user is banned they *do* have a ban)
-                        return Ok(new
-                        {
-                            banned = true,
-                            permaban = permaban,
-                            bannedUntil = DateTime.Parse("12/12/2030")
-                        });
+                        //ban has run out
+                        user.isBanned = false;
+                        await _db.SaveChangesAsync();
                     }
                 }
             }
