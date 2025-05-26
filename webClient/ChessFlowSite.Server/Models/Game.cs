@@ -26,7 +26,7 @@ namespace ChessFlowSite.Server.Models
         public int? EloWhite {  get; set; }
         public int? EloBlack { get; set; }
 
-        public int MoveCount { get; set; }
+        public int MoveCount { get; set; } = 0;
 
         public string? Format { get; set; }
 

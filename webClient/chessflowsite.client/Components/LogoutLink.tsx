@@ -1,13 +1,13 @@
 
 import { useNavigate } from "react-router-dom";
+import { getToken, clearToken } from "../Utils/authToken.ts";
+import SignalRStore from "../Stores/SignalRStore.ts";
 
 function LogoutLink(props: { children: React.ReactNode }) {
 
     const navigate = useNavigate();
 
-    function getToken(): string | null {
-        return localStorage.getItem("token") || sessionStorage.getItem("token");
-    }
+    const { startConnection, stopConnection } = SignalRStore();
 
     const token = getToken();
 
@@ -35,8 +35,9 @@ function LogoutLink(props: { children: React.ReactNode }) {
                 console.error(error);
             })
 
-        localStorage.removeItem("token");
-        sessionStorage.removeItem("token");
+        clearToken();
+        stopConnection();  // kill authenticated connection
+        startConnection();
     };
 
     return (

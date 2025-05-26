@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
-import UserStore from '../stores/UserStore.ts';
-import { getToken } from "../Utils/authToken.ts";
+import UserStore from '../Stores/UserStore.ts';
+import SignalRStore from "../Stores/SignalRStore.ts";
+import { getToken, setToken } from "../Utils/authToken.ts";
 import Banned from '../Components/Banned.tsx';
 function Login() {
     const { setUser } = UserStore();
+    const { startConnection, stopConnection } = SignalRStore();
 
 
     // state variables for email and passwords
@@ -72,11 +74,7 @@ function Login() {
                         else {
                             const token = data.token;
                             console.log(token);
-                            if (rememberme) {
-                                localStorage.setItem("token", token);
-                            } else {
-                                sessionStorage.setItem("token", token);
-                            }
+                            setToken(token, rememberme);
 
                             fetch("/api/account/pingauth", {
                                 method: "GET",
@@ -92,6 +90,10 @@ function Login() {
                                 else setError("Store error.")
                             });
                             setError("Login successful.");
+
+                            await stopConnection();  // kill unauthenticated connection
+                            await startConnection();
+
                             navigate("/");
                         }
                     }

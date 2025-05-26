@@ -1,4 +1,6 @@
+using ChessFlowSite.Server.Hubs;
 using ChessFlowSite.Server.Models;
+using ChessFlowSite.Server.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Build.Experimental;
@@ -22,7 +24,7 @@ namespace ChessFlowSite.Server
             // Add services to the container.
 
             var connectionString = builder.Configuration.GetConnectionString("ApplicationDbContextConnection");
-            builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlite(connectionString));
+            builder.Services.AddDbContextFactory<ApplicationDbContext>(options => options.UseSqlite(connectionString));
 
 
             builder.Services.AddAuthentication(options =>
@@ -41,6 +43,23 @@ namespace ChessFlowSite.Server
                     ValidIssuer = builder.Configuration["Jwt:Issuer"],
                     ValidAudience = builder.Configuration["Jwt:Audience"],
                     IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+                };
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = context =>
+                    {
+                        var accessToken = context.Request.Query["access_token"];
+
+                        // If the request is for our SignalR hub...
+                        var path = context.HttpContext.Request.Path;
+                        if (!string.IsNullOrEmpty(accessToken) &&
+                            (path.StartsWithSegments("/api/gamehub")))
+                        {
+                            // Read the token out of the query string
+                            context.Token = accessToken;
+                        }
+                        return Task.CompletedTask;
+                    }
                 };
             });
             builder.Services.AddSwaggerGen(option =>
@@ -74,34 +93,20 @@ namespace ChessFlowSite.Server
             });
             builder.Services.AddSwaggerExamplesFromAssemblyOf<Program>();
 
+            builder.Services.AddSignalR();
+            builder.Services.AddSingleton<GameManager>();
+
             builder.Services.AddAuthorization();
             builder.Services.AddIdentityApiEndpoints<ApplicationUser>().AddRoles<IdentityRole>().AddEntityFrameworkStores<ApplicationDbContext>();
 
             builder.Services.AddControllers();
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
-            builder.Services.AddSwaggerGen();
 
             var app = builder.Build();
 
             app.UseDefaultFiles();
             app.UseStaticFiles();
-            app.MapIdentityApi<ApplicationUser>();
-
-            app.MapPost("/logout", async (SignInManager<ApplicationUser> signInManager) =>
-            {
-
-                await signInManager.SignOutAsync();
-                return Results.Ok();
-
-            }).RequireAuthorization();
-
-
-            app.MapGet("/pingauth", (ClaimsPrincipal user) =>
-            {
-                var email = user.FindFirstValue(ClaimTypes.Email); // get the user's email from the claim
-                return Results.Json(new { Email = email }); ; // return the email as a plain text response
-            }).RequireAuthorization();
 
             using (var scope = app.Services.CreateScope())
             {
@@ -123,6 +128,8 @@ namespace ChessFlowSite.Server
 
             app.UseAuthentication();
             app.UseAuthorization();
+
+            app.MapHub<GameHub>("/api/gamehub");
 
 
             app.MapControllers();
