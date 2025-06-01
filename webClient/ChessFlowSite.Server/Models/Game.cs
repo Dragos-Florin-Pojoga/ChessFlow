@@ -23,8 +23,11 @@ namespace ChessFlowSite.Server.Models
 
         public string Result { get; set; } = "InProgress";
 
-        public int? EloWhite {  get; set; }
-        public int? EloBlack { get; set; }
+        public int EloWhite {  get; set; }
+        public int EloBlack { get; set; }
+
+        public int? DeltaEloWhite { get; set; } = 0;
+        public int? DeltaEloBlack { get; set; } = 0;
 
         public int MoveCount { get; set; } = 0;
 

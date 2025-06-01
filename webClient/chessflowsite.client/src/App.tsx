@@ -17,6 +17,9 @@ import ReportShow from '../Pages/ReportShow.tsx';
 import UserShow from '../Pages/UserShow.tsx';
 import BanShow from '../Pages/BanShow.tsx';
 import GameHub from '../Pages/GameHub.tsx';
+import ChessGame from '../Pages/ChessGame.tsx';
+import GameInfo from '../Pages/GameInfo.tsx';
+import GameShow from '../Pages/GameShow.tsx';
 function App() {
 
     useEffect(() => {
@@ -37,6 +40,9 @@ function App() {
                 <Route path="/report/:username" element={<Report />} />
                 <Route path="/ban/:username" element={<Ban />} />
                 <Route path="/gamehub" element={<GameHub />} />"
+                <Route path="/game/play/:id" element={<ChessGame />} />"
+                <Route path="/game/:id" element={<GameInfo />} />"
+                <Route path="/games" element={<GameShow />} />
                 <Route path="/" element={<Home />} />
             </Routes>
         </BrowserRouter>

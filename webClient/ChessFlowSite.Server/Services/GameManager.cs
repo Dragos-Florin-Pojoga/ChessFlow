@@ -61,9 +61,28 @@ namespace ChessFlowSite.Server.Services
             game.IsBotGame = true;
             game.IsRated = true; //temp maybe
             game.Format = player.Format;
+            game.EloWhite = player.Elo;
+            game.EloBlack = botId switch
+            {
+                0 => 1500, // ChessFlow Engine default elo
+                _ => 1200 // Default elo for unknown bots
+            };
+
+            var botElo = botId switch
+            {
+                0 => 1500, // ChessFlow Engine default elo
+                _ => 1200 // Default elo for unknown bots
+            };
 
             db.Games.Add(game);
             await db.SaveChangesAsync();
+
+            // get the game with players included (if they are not guests)
+            game = await db.Games
+            .Include(g => g.PlayerWhite)
+            .Include(g => g.PlayerBlack)
+            .FirstOrDefaultAsync(g => g.Id == game.Id);
+
 
             var session = new GameSession(game.Id, player, null, clients);
             lock (_lock)
@@ -71,18 +90,14 @@ namespace ChessFlowSite.Server.Services
                 _activeGames[game.Id] = session;
             }
 
-            await clients.Client(player.ConnectionId).SendAsync("GameStarted", game.Id, "white", game.GuestBlackName);
+            await clients.Client(player.ConnectionId).SendAsync("GameStarted", game.Id, new GameDataModel(game, "w", player.Elo, botElo));
         }
 
         public async Task ProcessMoveAsync(int gameId, string connectionId, string move)
         {
             if (_activeGames.TryGetValue(gameId, out var session))
             {
-                var opponentId = session.GetOpponentId(connectionId);
-                if (opponentId != null)
-                {
-                    await session.SendMoveToOpponent(move, opponentId);
-                }
+                await session.SendMoveToGM(move, connectionId);
             }
         }
 
@@ -130,9 +145,17 @@ namespace ChessFlowSite.Server.Services
             game.IsBotGame = false;
             game.IsRated = true; //temp maybe
             game.Format = p1.Format;
+            game.EloWhite = p1.Elo;
+            game.EloBlack = p2.Elo;
 
             db.Games.Add(game);
             await db.SaveChangesAsync();
+
+            // get the game with players included (if they are not guests)
+            game = await db.Games
+            .Include(g => g.PlayerWhite)
+            .Include(g => g.PlayerBlack)
+            .FirstOrDefaultAsync(g => g.Id == game.Id);
 
             var session = new GameSession(game.Id, p1, p2, clients);
             lock (_lock)
@@ -140,8 +163,45 @@ namespace ChessFlowSite.Server.Services
                 _activeGames[game.Id] = session;
             }
 
-            await clients.Client(p1.ConnectionId).SendAsync("GameStarted", game.Id, "white", p2.Username);
-            await clients.Client(p2.ConnectionId).SendAsync("GameStarted", game.Id, "black", p1.Username);
+            await clients.Client(p1.ConnectionId).SendAsync("GameStarted", game.Id, new GameDataModel(game, "w", p1.Elo, p2.Elo));
+            await clients.Client(p2.ConnectionId).SendAsync("GameStarted", game.Id, new GameDataModel(game, "b", p2.Elo, p1.Elo));
         }
     }
+
+    public class GameDataModel {
+        public string Side { get; set; } // "white" or "black"
+        public string Name { get; set; }
+        public string OpponentName { get; set; }
+        public int Elo { get; set; }
+        public int OpponentElo { get; set; }
+
+        public bool IsGuest { get; set; }
+        public bool IsOpponentGuest { get; set; }
+        public bool IsBotGame { get; set; }
+        public string Format { get; set; } // "Blitz", "Bullet", "Classical"
+
+        public int Timer { get; set; }
+        public int OpponentTimer { get; set; }
+        public string Fen { get; set; }
+
+        public GameDataModel(Game game, string side, int elo, int opponentElo) {
+
+            Side = side;
+            Name = side == "w" ? game.GuestWhiteName ?? game.PlayerWhite?.Name : game.GuestBlackName ?? game.PlayerBlack?.Name;
+            OpponentName = side == "w" ? game.GuestBlackName ?? game.PlayerBlack?.Name : game.GuestWhiteName ?? game.PlayerWhite?.Name;
+            Elo = elo;
+            OpponentElo = opponentElo;
+            IsGuest = side == "w" ? game.GuestWhiteName != null : game.GuestBlackName != null;
+            IsOpponentGuest = side == "w" ? game.GuestBlackName != null : game.GuestWhiteName != null;
+            IsBotGame = game.IsBotGame;
+            Format = game.Format ?? "Classical"; // Default to Classical if not set
+            Timer = Format == "Bullet" ? 300 :
+                    Format == "Blitz" ? 600 :
+                    Format == "Classical" ? 3600 : 0; // Default timer values for different formats
+            OpponentTimer = Timer; // Assuming both players start with the same timer
+            Fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; // Initial FEN for a new game, temporary hardcoded string for now
+        }
+    }
+
+
 }

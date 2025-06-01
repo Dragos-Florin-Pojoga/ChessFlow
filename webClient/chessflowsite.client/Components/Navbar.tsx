@@ -23,6 +23,7 @@ function NavBar(props: { children: React.ReactNode }) {
             <span><OwnProfileLink>Go to profile</OwnProfileLink></span>
             <span><a href="#" onClick={() => navigate("/users")}>Users stats</a></span>
             <span><a href="#" onClick={() => navigate("/")}>Go Home</a></span>
+            <span><a href="#" onClick={() => navigate("/games")}>Games</a></span>
             </div>
     );
 }

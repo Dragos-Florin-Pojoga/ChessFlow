@@ -139,6 +139,7 @@ function ReportShow() {
                                     <th className="border px-2 py-1">Reason</th>
                                     <th className="border px-2 py-1">Date created</th>
                                     <th className="border px-2 py-1"></th>
+                                    <th className="border px-2 py-1"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -154,9 +155,16 @@ function ReportShow() {
                                             <td className="border px-2 py-1">{r.reportID}</td>
                                             <td className="border px-2 py-1">{r.reportedName}</td>
                                             <td className="border px-2 py-1">{r.reporteeName}</td>
-                                            <td className="border px-2 py-1">{r.gameID ?? 'N/A'}</td>
+                                            <td className="border px-2 py-1">{r.gameID != null ? (<a href="#" onClick={() => navigate(`/game/${r.gameID}`)}>{r.gameID}</a>) : 'N/A'}</td>
                                             <td className="border px-2 py-1">{r.reason}</td>
                                             <td className="border px-2 py-1">{r.created}</td>
+                                            <td className="border px-2 py-1">
+                                                {
+                                                    r.reportedBanned ? <></>
+                                                        :
+                                                        <a href="#" onClick={() => navigate(`/games/?usernameOne=${r.reportedName}`)}>See all games</a>
+                                                }
+                                            </td>
                                             <td className="border px-2 py-1">
                                                 {
                                                     r.reportedBanned ?

@@ -1,9 +1,13 @@
 import React, { useState, useEffect, use } from "react";
+import { useNavigate } from "react-router-dom";
 import UserStore from '../Stores/UserStore.ts';
 import NavBar from "../Components/NavBar.tsx";
-import SignalRStore from '../Stores/signalRStore.ts';
+import SignalRStore from '../Stores/SignalRStore.ts';
+import GameStore from '../Stores/GameStore.ts';
 import { isLoggedIn } from '../Utils/authToken.ts';
 import { connect } from "http2";
+
+import '../src/TailwindScoped.css';
 
 function GameHub() {
     const [guestElo, setGuestElo] = useState<number>(1200);
@@ -17,8 +21,11 @@ function GameHub() {
 
     const { connection, startConnection, stopConnection } = SignalRStore();
     const { user, setUser, clearUser } = UserStore();
+    const { game, setGame } = GameStore();
 
     const setError = (e: string) => setErrors([e]);
+
+    const navigate = useNavigate();
 
     useEffect(() => {
         if (!connection) return;
@@ -27,10 +34,30 @@ function GameHub() {
             setError(message);
             setStatus("");
         };
-
-        const handleGameStarted = (gameId: number, side: string, opponentName: string) => {
-            setError(`Game with ID ${gameId} started as ${side} matched with ${opponentName}!`);
+        const handleGameStarted = (gameId: number, gameData: any) => {
+            console.log(gameData);
+            setError(`Game with ID ${gameId} started as ${gameData.side} matched with ${gameData.opponentName}!`);
             setStatus("");
+            setGame({
+                id: gameId,
+                side: gameData.side as 'w' | 'b',
+                activeSide: "w", // starts with white, will be updated by server
+                name: gameData.name,
+                opponentName: gameData.opponentName,
+                elo: gameData.elo,
+                opponentElo: gameData.opponentElo,
+                isGuest: gameData.isGuest,
+                isOpponentGuest: gameData.isOpponentGuest,
+                isBot: gameData.isBotGame,
+                format: gameData.format,
+                timer: gameData.timer,
+                opponentTimer: gameData.opponentTimer,
+                fen: gameData.fen,
+                moveHistory: [] 
+            });
+            console.log(game);
+            // Navigate to the game page
+            navigate(`/game/play/${gameId}`, { replace: true });
         }
 
         connection.on("Error", handleError);
@@ -129,8 +156,8 @@ function GameHub() {
                         <label className="block text-sm font-medium">Time format: </label>
                         <select id="format" name="format" value={format} onChange={(e) => setFormat(e.target.value)} defaultValue={"Classical"}>
                             <option value={"Classical"}>Classical</option>
-                            <option value={"Bullet"}>Bullet</option>
                             <option value={"Blitz"}>Blitz</option>
+                            <option value={"Bullet"}>Bullet</option>
                         </select>
                     </div>
                     <div>

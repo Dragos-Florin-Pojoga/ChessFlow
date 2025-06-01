@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Navigate } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate, Navigate } from "react-router-dom";
 import AuthorizeView from "../Components/AuthorizeView.js";
 import NavBar from "../Components/NavBar.js";
 import { getToken } from "../Utils/authToken.ts";
@@ -7,6 +7,7 @@ import UserStore from '../stores/UserStore.ts';
 
 function Report() {
     const param = useParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [reason, setReason] = useState("");
     // state variable for error messages (and also other messages)
     const [errors, setErrors] = useState<string[]>([]);
@@ -17,6 +18,7 @@ function Report() {
 
     console.log(param);
     const username = param.username;
+    const gameID = searchParams.get("gameID")
 
     const token = getToken();
 
@@ -48,7 +50,8 @@ function Report() {
                 body: JSON.stringify({
                     ReportedName: username,
                     ReporteeName: user.name,
-                    Reason: reason
+                    Reason: reason,
+                    gameID: gameID || null
                 }),
             }).then(async (response) => {
                 console.log(response);
