@@ -12,6 +12,7 @@ pub enum Color {
 
 impl Color {
     /// Returns the opponent's color.
+    #[inline]
     pub fn opponent(self) -> Self {
         match self {
             Color::White => Color::Black,
@@ -53,22 +54,27 @@ impl CastlingRights {
     pub const BLACK_KINGSIDE: u8 = 1 << 2;
     pub const BLACK_QUEENSIDE: u8 = 1 << 3;
 
+    #[inline]
     pub fn new_all() -> Self {
         Self(Self::WHITE_KINGSIDE | Self::WHITE_QUEENSIDE | Self::BLACK_KINGSIDE | Self::BLACK_QUEENSIDE)
     }
 
+    #[inline]
     pub fn has_right(&self, right: u8) -> bool {
         (self.0 & right) != 0
     }
 
+    #[inline]
     pub fn remove_right(&mut self, right: u8) {
         self.0 &= !right;
     }
 
+    #[inline]
     pub fn add_right(&mut self, right: u8) {
         self.0 |= right;
     }
     
+    #[inline]
     pub fn can_castle_kingside(&self, color: Color) -> bool {
         match color {
             Color::White => self.has_right(Self::WHITE_KINGSIDE),
@@ -76,6 +82,7 @@ impl CastlingRights {
         }
     }
 
+    #[inline]
     pub fn can_castle_queenside(&self, color: Color) -> bool {
         match color {
             Color::White => self.has_right(Self::WHITE_QUEENSIDE),
@@ -112,16 +119,45 @@ impl fmt::Display for CastlingRights {
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CastlingRookMove {
+    pub from: Square,
+    pub to: Square,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ChessMove {
     pub from: Square,
     pub to: Square,
     pub promotion: Option<PieceType>,
-    // TODO: flags? capture type, castling, .... // can be added later if needed
+
+    // pub moving_piece: PieceType,
+    // pub captured_piece: Option<PieceType>,
+    // pub is_en_passant: bool,
+    // pub is_castling: bool,
+
+    // pub castling_rook: Option<CastlingRookMove>,
 }
 
 impl ChessMove {
+    #[inline]
     pub fn new(from: Square, to: Square, promotion: Option<PieceType>) -> Self {
         Self { from, to, promotion }
+    }
+}
+
+impl ChessMove {
+    pub fn to_uci(&self) -> String {
+        let mut s = format!("{}{}", self.from.to_algebraic(), self.to.to_algebraic());
+        if let Some(promo) = self.promotion {
+            s.push(match promo {
+                PieceType::Knight => 'n',
+                PieceType::Bishop => 'b',
+                PieceType::Rook => 'r',
+                PieceType::Queen => 'q',
+                _ => ' ',
+            });
+        }
+        s
     }
 }
 
@@ -288,6 +324,8 @@ pub struct Board {
     pub en_passant_square: Option<Square>, // Target square for en passant, if any      see: https://www.chessprogramming.org/En_passant
     pub halfmove_clock: u8, // For 50-move rule                                         see: https://www.chessprogramming.org/Halfmove_Clock
     pub fullmove_number: u16,
+
+    // pub zobrist_hash: u64,
 }
 
 impl Board {
@@ -301,6 +339,7 @@ impl Board {
             en_passant_square: None,
             halfmove_clock: 0,
             fullmove_number: 1,
+            // zobrist_hash: 0,
         };
 
         // Setup pawns                                                                                                              see: https://images.chesscomfiles.com/uploads/v1/images_users/tiny_mce/ColinStapczynski/phpa2wQPr.png
@@ -328,21 +367,25 @@ impl Board {
     }
 
     /// Updates the main occupied bitboard from color bitboards.
+    #[inline]
     pub fn update_occupied_bb(&mut self) {
         self.occupied_bb = self.color_bbs[0] | self.color_bbs[1];
     }
     
     /// Gets the bitboard of pieces for the current player.
+    #[inline]
     pub fn current_player_pieces_bb(&self) -> Bitboard {
         self.color_bbs[self.turn as usize]
     }
 
     /// Gets the bitboard of pieces for the opponent.
+    #[inline]
     pub fn opponent_pieces_bb(&self) -> Bitboard {
         self.color_bbs[self.turn.opponent() as usize]
     }
     
     /// Gets the bitboard of empty squares.
+    #[inline]
     pub fn empty_squares_bb(&self) -> Bitboard {
         !self.occupied_bb
     }
@@ -382,6 +425,7 @@ impl Board {
             en_passant_square: None,
             halfmove_clock: 0,
             fullmove_number: 1, // Default, will be overwritten
+            // zobrist_hash: 0,
         }
     }
 
@@ -532,4 +576,116 @@ impl fmt::Display for Board {
 
         Ok(())
     }
+}
+
+
+
+
+
+
+
+
+use rand::{RngCore, SeedableRng};
+use rand::rngs::StdRng;
+use once_cell::sync::Lazy;
+
+pub struct ZobristHashes {
+    /// Hashes for each piece type, color, and square.
+    /// Indexed as `piece_square_hashes[PieceType as usize][Color as usize][Square as usize]`.
+    piece_square_hashes: [[[u64; 64]; 2]; 6],
+    /// Hashes for the current turn (White or Black).
+    /// Indexed as `turn_hash[Color as usize]`.
+    turn_hash: [u64; 2],
+    /// Hashes for all 16 possible castling rights combinations (since `CastlingRights` is a `u8` bitmask).
+    /// Indexed by the `u8` value of `CastlingRights`.
+    castling_hashes: [u64; 16],
+    /// Hashes for each possible en passant square (0-63).
+    /// Indexed as `en_passant_hashes[Square as usize]`.
+    en_passant_hashes: [u64; 64],
+}
+
+impl ZobristHashes {
+    pub fn new() -> Self {
+        let mut rng = StdRng::seed_from_u64(27);
+
+        let mut hashes = ZobristHashes {
+            piece_square_hashes: [[[0; 64]; 2]; 6],
+            turn_hash: [0; 2],
+            castling_hashes: [0; 16],
+            en_passant_hashes: [0; 64],
+        };
+
+        for pt_idx in 0..6 {
+            for color_idx in 0..2 {
+                for sq_idx in 0..64 {
+                    hashes.piece_square_hashes[pt_idx][color_idx][sq_idx] = rng.next_u64();
+                }
+            }
+        }
+
+        hashes.turn_hash[Color::White as usize] = rng.next_u64();
+        hashes.turn_hash[Color::Black as usize] = rng.next_u64();
+
+        for i in 0..16 {
+            hashes.castling_hashes[i] = rng.next_u64();
+        }
+
+        for i in 0..64 {
+            hashes.en_passant_hashes[i] = rng.next_u64();
+        }
+
+        hashes
+    }
+}
+
+static ZOBRIST_HASHES: Lazy<ZobristHashes> = Lazy::new(|| ZobristHashes::new());
+
+impl Board {
+    pub fn compute_zobrist_hash(&self) -> u64 {
+        let zobrist_hashes = &ZOBRIST_HASHES;
+        let mut hash = 0u64;
+
+        // 1. Hash pieces on squares
+        for pt_idx in 0..6 { // PieceType (e.g., Pawn, Knight, Bishop, Rook, Queen, King)
+            for color_idx in 0..2 { // Color (White, Black)
+                let piece_type_bb = self.piece_bbs[pt_idx];
+                let color_bb = self.color_bbs[color_idx];
+                let specific_piece_bb = piece_type_bb & color_bb; // Get bitboard for this specific piece type and color
+
+                // Iterate over set bits in the combined bitboard
+                for sq_idx in specific_piece_bb.iter() {
+                    hash ^= zobrist_hashes.piece_square_hashes[pt_idx][color_idx][sq_idx as usize];
+                }
+            }
+        }
+
+        // 2. Hash the current turn
+        hash ^= zobrist_hashes.turn_hash[self.turn as usize];
+
+        // 3. Hash the castling rights
+        // The `CastlingRights` struct's inner `u8` value directly represents the combination.
+        hash ^= zobrist_hashes.castling_hashes[self.castling_rights.0 as usize];
+        // NOTE: this might need per component hashes?
+
+        // 4. Hash the en passant square, if one exists
+        if let Some(sq) = self.en_passant_square {
+            hash ^= zobrist_hashes.en_passant_hashes[sq as usize];
+        }
+
+        // EDGE CASE?????
+        // if let Some(sq) = self.en_passant_square {
+        //     if self.can_capture_en_passant(sq) {
+        //         hash ^= zobrist_hashes.en_passant_hashes[sq as usize];
+        //     }
+        // }
+
+        hash
+    }
+
+    // pub fn get_zobrist_hash(&mut self) -> u64 {
+    //     if self.zobrist_hash == 0 {
+    //         self.zobrist_hash = self.compute_zobrist_hash(); // TODO: just compute the hash for the initial startpos and then the rest are only updates
+    //     }
+    //     self.zobrist_hash
+    // }
 }

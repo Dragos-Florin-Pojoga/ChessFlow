@@ -4,18 +4,15 @@ impl Board {
     /// Generates all pseudo-legal moves for the current player.
     /// Pseudo-legal moves are moves that are valid for the piece type,
     /// but do not check if the king is left in check.
-    pub fn generate_pseudo_legal_moves(&self) -> Vec<ChessMove> {
-        let mut moves = Vec::with_capacity(64); // Pre-allocate, rough estimate
+    pub fn generate_pseudo_legal_moves(&self, moves: &mut Vec<ChessMove>) {
         let player_color = self.turn;
         
-        self.generate_pawn_moves(&mut moves, player_color);
-        self.generate_leaper_moves(&mut moves, player_color, PieceType::Knight);
-        self.generate_king_moves(&mut moves, player_color); // Includes castling
-        self.generate_sliding_moves(&mut moves, player_color, PieceType::Bishop);
-        self.generate_sliding_moves(&mut moves, player_color, PieceType::Rook);
-        self.generate_sliding_moves(&mut moves, player_color, PieceType::Queen);
-        
-        moves
+        self.generate_pawn_moves(moves, player_color);
+        self.generate_leaper_moves(moves, player_color, PieceType::Knight);
+        self.generate_king_moves(moves, player_color); // Includes castling
+        self.generate_sliding_moves(moves, player_color, PieceType::Bishop);
+        self.generate_sliding_moves(moves, player_color, PieceType::Rook);
+        self.generate_sliding_moves(moves, player_color, PieceType::Queen);
     }
 
     fn generate_pawn_moves(&self, moves: &mut Vec<ChessMove>, color: Color) {
@@ -139,6 +136,7 @@ impl Board {
         let friendly_bb = self.color_bbs[color as usize];
         
         for from_sq in pieces_bb.iter() {
+            // TODO: potential improvement if match outside for loop?
             let attacks = match piece_type {
                 PieceType::Bishop => self.get_bishop_attacks(from_sq, self.occupied_bb),
                 PieceType::Rook => self.get_rook_attacks(from_sq, self.occupied_bb),
@@ -220,6 +218,45 @@ impl Board {
         }
         
         false
+    }
+
+
+    pub fn get_attacked_squares(&self, attacker_color: Color) -> Bitboard {
+        let mut attacked_squares = Bitboard::new();
+        let opponent_pieces = self.color_bbs[attacker_color as usize];
+
+        // Pawn attacks
+        let pawns = self.piece_bbs[PieceType::Pawn as usize] & opponent_pieces;
+        for sq in pawns.iter() {
+            attacked_squares |= PRECOMPUTED.pawn_attacks[attacker_color as usize][sq.to_u8() as usize];
+        }
+
+        // Knight attacks
+        let knights = self.piece_bbs[PieceType::Knight as usize] & opponent_pieces;
+        for sq in knights.iter() {
+            attacked_squares |= PRECOMPUTED.knight_attacks[sq.to_u8() as usize];
+        }
+
+        // King attacks
+        let king = self.piece_bbs[PieceType::King as usize] & opponent_pieces;
+        // Assuming there's only one king of a given color on the board for simplicity
+        if let Some(king_sq) = king.iter().next() {
+            attacked_squares |= PRECOMPUTED.king_attacks[king_sq.to_u8() as usize];
+        }
+
+        // Rook and Queen attacks (rook-like)
+        let rook_like_attackers = (self.piece_bbs[PieceType::Rook as usize] | self.piece_bbs[PieceType::Queen as usize]) & opponent_pieces;
+        for sq in rook_like_attackers.iter() {
+            attacked_squares |= self.get_rook_attacks(sq, self.occupied_bb);
+        }
+
+        // Bishop and Queen attacks (bishop-like)
+        let bishop_like_attackers = (self.piece_bbs[PieceType::Bishop as usize] | self.piece_bbs[PieceType::Queen as usize]) & opponent_pieces;
+        for sq in bishop_like_attackers.iter() {
+            attacked_squares |= self.get_bishop_attacks(sq, self.occupied_bb);
+        }
+
+        attacked_squares
     }
 }
 
@@ -424,9 +461,12 @@ impl Board {
     }
 
     /// Generates all fully legal moves for the current player.
-    pub fn generate_legal_moves(&self) -> Vec<ChessMove> {
-        let pseudo_legal_moves = self.generate_pseudo_legal_moves();
-        let mut legal_moves = Vec::with_capacity(pseudo_legal_moves.len());
+    #[cfg_attr(feature = "tracy", tracing::instrument(skip_all))]
+    pub fn generate_legal_moves(&self, pseudo_legal_moves: &mut Vec<ChessMove>, legal_moves: &mut Vec<ChessMove>) {
+        pseudo_legal_moves.clear();
+        legal_moves.clear();
+
+        self.generate_pseudo_legal_moves(pseudo_legal_moves);
         let current_player_color = self.turn;
 
         for mv in pseudo_legal_moves.iter() {
@@ -468,7 +508,6 @@ impl Board {
                 legal_moves.push(*mv);
             }
         }
-        legal_moves
     }
 }
 

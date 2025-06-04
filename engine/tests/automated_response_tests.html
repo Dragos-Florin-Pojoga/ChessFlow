@@ -11,15 +11,8 @@
     <script type="module">
         import { createEngineWorker } from '/public/engine.js';
 
-        const engine = createEngineWorker();
-
-        // FIXME: this is a really hacky way of making sure the WASM module was properly loaded
-        // I cannot seem to find a way of awaiting for the createEngineWorker() to complete as
-        // it throws "DOMException: Function object could not be cloned." just from being marked
-        // as async and awaiting it.
-        await new Promise(r => setTimeout(r, 400));
-
-
+        const engine = await createEngineWorker();
+        
         function logToPage(message) {
             const output = document.getElementById('output');
             output.innerHTML += message;

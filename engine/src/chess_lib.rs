@@ -2,6 +2,7 @@
 // https://www.chess.com/terms
 // https://www.chessprogramming.org/Main_Page
 
+// #![allow(unused_imports)]
 
 pub mod uci_parser;
 pub use uci_parser::*;

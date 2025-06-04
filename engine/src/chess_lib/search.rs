@@ -1,56 +1,124 @@
-use crate::bitboard::*;
 use crate::board::*;
-use crate::moves::*;
 use crate::terminal_states::*;
+use std::cmp::max;
+use std::cmp::min;
+use std::collections::HashMap;
 
-impl Board {
-    /// Minimax with alpha–beta pruning.
-    /// `alpha` is the best score that the maximizer (White) can guarantee so far.
-    /// `beta`  is the best score that the minimizer (Black) can guarantee so far.
-    pub fn alphabeta(&self, depth: u8, mut alpha: i32, mut beta: i32) -> i32 {
-        // Base case
-        let game_state = self.check_game_state();
-        if depth == 0 || game_state != GameState::Ongoing {
-            return self.evaluate(depth);
+pub struct Game {
+    pub board: Board,
+    pub pseudo_legal_moves_container: Vec<Vec<ChessMove>>,
+    pub legal_moves_container: Vec<Vec<ChessMove>>,
+    pub max_search_depth: usize,
+    pub board_repetition_counts: HashMap<u64, u8>,
+}
+
+impl Game {
+    pub fn new(max_search_depth: usize) -> Self {
+        let mut game = Self {
+            board: Board::new_start_pos(),
+            pseudo_legal_moves_container: Vec::with_capacity(max_search_depth + 1),
+            legal_moves_container: Vec::with_capacity(max_search_depth + 1),
+            max_search_depth: max_search_depth,
+            board_repetition_counts: HashMap::new(),
+        };
+
+        for _ in 0..=game.max_search_depth {
+            game.pseudo_legal_moves_container.push(Vec::with_capacity(200));
+            game.legal_moves_container.push(Vec::with_capacity(100));
         }
 
-        let legal_moves = self.generate_legal_moves();
+        game.board_repetition_counts.entry(game.board.compute_zobrist_hash()).or_insert(0);
 
-        if self.turn == Color::White {
+        game
+    }
+
+    pub fn new_from_fen(fen: &Fen, max_search_depth: usize) -> Result<Self, FenParseError> {
+        let board = Board::from_fen(fen)?;
+        let mut game = Game {
+            board,
+            pseudo_legal_moves_container: Vec::with_capacity(max_search_depth + 1),
+            legal_moves_container: Vec::with_capacity(max_search_depth + 1),
+            max_search_depth: max_search_depth,
+            board_repetition_counts: HashMap::new(),
+        };
+        for _ in 0..=game.max_search_depth {
+            game.pseudo_legal_moves_container.push(Vec::with_capacity(200));
+            game.legal_moves_container.push(Vec::with_capacity(100));
+        }
+        game.board_repetition_counts.entry(game.board.compute_zobrist_hash()).or_insert(0);
+        Ok(game)
+    }
+
+
+
+
+    // RECURSIVE MUTABLE METHODS ARE THE WORST
+    #[cfg_attr(feature = "tracy", tracing::instrument(skip_all))]
+    pub fn alphabeta(&mut self, board: Board, depth: u8, mut alpha: i32, mut beta: i32) -> i32 {
+        let mut pseudo_legal_moves = std::mem::take(&mut self.pseudo_legal_moves_container[depth as usize]);
+        let mut legal_moves = std::mem::take(&mut self.legal_moves_container[depth as usize]);
+
+        board.generate_legal_moves(&mut pseudo_legal_moves, &mut legal_moves);
+
+        let board_hash = board.compute_zobrist_hash();
+        let board_repetition_count = {
+            let count_ref = self.board_repetition_counts.entry(board_hash).or_insert(0);
+            *count_ref += 1;
+            *count_ref
+        };
+
+        let game_state = board.check_game_state(legal_moves.is_empty(), board_repetition_count);
+        if depth == 0 || game_state != GameState::Ongoing || legal_moves.is_empty() {
+            let eval = board.evaluate(depth, &mut pseudo_legal_moves, &mut legal_moves, game_state);
+            *self.board_repetition_counts.get_mut(&board_hash).unwrap() -= 1;
+            self.pseudo_legal_moves_container[depth as usize] = pseudo_legal_moves;
+            self.legal_moves_container[depth as usize] = legal_moves;
+            return eval;
+        }
+
+        let result_value;
+
+        if board.turn == Color::White {
             let mut value = i32::MIN;
-            for mv in legal_moves {
-                let new_board = self.make_move(&mv);
-                let score = new_board.alphabeta(depth - 1, alpha, beta);
-                value = value.max(score);
-                alpha = alpha.max(value);
-                // β-cutoff: the minimizer won’t let us get anything ≥ β
+            for mv in &legal_moves {
+                let new_board = board.make_move(&mv);
+                let score = self.alphabeta(new_board, depth - 1, alpha, beta);
+                value = max(value, score);
+                alpha = max(alpha, value);
                 if alpha >= beta {
                     break;
                 }
             }
-            value
-        } else {
+            result_value = value;
+        }
+        else {
             let mut value = i32::MAX;
-            for mv in legal_moves {
-                let new_board = self.make_move(&mv);
-                let score = new_board.alphabeta(depth - 1, alpha, beta);
-                value = value.min(score);
-                beta = beta.min(value);
-                // α-cutoff: the maximizer won’t let us get anything ≤ α
+            for mv in &legal_moves {
+                let new_board = board.make_move(&mv);
+                let score = self.alphabeta(new_board, depth - 1, alpha, beta);
+                value = min(value, score);
+                beta = min(beta, value);
                 if beta <= alpha {
                     break;
                 }
             }
-            value
+            result_value = value;
         }
+
+        *self.board_repetition_counts.get_mut(&board_hash).unwrap() -= 1;
+        self.pseudo_legal_moves_container[depth as usize] = pseudo_legal_moves;
+        self.legal_moves_container[depth as usize] = legal_moves;
+
+        result_value
     }
 
+
     // WIP
-    fn score_move(&self, mv: &ChessMove) -> i32 {
+    fn score_move(&mut self, mv: &ChessMove) -> i32 {
         // if mv.is_capture() {
             // victim_value - attacker_value
-            let victim = self.piece_on_square(mv.to);
-            let attacker = self.piece_on_square(mv.from);
+            let victim = self.board.piece_on_square(mv.to);
+            let attacker = self.board.piece_on_square(mv.from);
 
             match (victim, attacker) {
                 (Some(victim), Some(attacker)) => {
@@ -82,45 +150,83 @@ impl Board {
         // }
     }
 
-    pub fn find_best_move(&self, depth: u8) -> Option<ChessMove> {
-        let mut legal_moves = self.generate_legal_moves();
-        if legal_moves.is_empty() { return None; }
-        legal_moves.sort_unstable_by_key(|mv| -self.score_move(mv)); 
+    #[cfg_attr(feature = "tracy", tracing::instrument(skip_all))]
+    pub fn find_best_move(&mut self, depth: u8) -> Option<ChessMove> {
+        if depth as usize > self.max_search_depth {
+            eprintln!("Error: Initial search depth ({}) exceeds the engine's configured max_depth ({}).", depth, self.max_search_depth);
+            return None;
+        }
+
+        let mut pseudo_legal_moves = std::mem::take(&mut self.pseudo_legal_moves_container[depth as usize]);
+        let mut legal_moves = std::mem::take(&mut self.legal_moves_container[depth as usize]);
+
+        self.board.generate_legal_moves(&mut pseudo_legal_moves, &mut legal_moves);
+
+        if legal_moves.is_empty() {
+            return None;
+        }
+
+        legal_moves.sort_unstable_by_key(|mv| -self.score_move(mv));
+
+        let board_hash = self.board.compute_zobrist_hash();
+        *self.board_repetition_counts.entry(board_hash).or_insert(0) += 1;
 
         let mut best = None;
-        // We initialize alpha, beta to the worst possible bounds
         let mut alpha = i32::MIN;
-        let mut beta  = i32::MAX;
+        let mut beta = i32::MAX;
 
-        if self.turn == Color::White {
+        if self.board.turn == Color::White {
             let mut best_score = i32::MIN;
             for mv in legal_moves {
-                let score = self.make_move(&mv)
-                                 .alphabeta(depth - 1, alpha, beta);
+                let score = self.alphabeta(self.board.make_move(&mv), depth - 1, alpha, beta);
                 if score > best_score {
                     best_score = score;
                     best = Some(mv);
                 }
-                alpha = alpha.max(best_score);
+                alpha = max(alpha, best_score);
             }
         } else {
             let mut best_score = i32::MAX;
             for mv in legal_moves {
-                let score = self.make_move(&mv)
-                                 .alphabeta(depth - 1, alpha, beta);
+                let score = self.alphabeta(self.board.make_move(&mv), depth - 1, alpha, beta);
                 if score < best_score {
                     best_score = score;
                     best = Some(mv);
                 }
-                beta = beta.min(best_score);
+                beta = min(beta, best_score);
             }
         }
 
+        *self.board_repetition_counts.get_mut(&board_hash).unwrap() -= 1;
+
         best
     }
-}
 
-// depth = 4
-// 155745 ms
-//  26599 ms
-//  20784 ms
+
+    pub fn make_move(&mut self, mv: &ChessMove) {
+        self.board = self.board.make_move(&mv);
+        *self.board_repetition_counts.entry(self.board.compute_zobrist_hash()).or_insert(0) += 1;
+    }
+
+    pub fn print(&mut self) {
+        println!("{}", self.board);
+    }
+
+    pub fn print_end(&mut self) {
+        let mut pseudo_legal_moves = std::mem::take(&mut self.pseudo_legal_moves_container[0]);
+        let mut legal_moves = std::mem::take(&mut self.legal_moves_container[0]);
+
+        self.board.generate_legal_moves(&mut pseudo_legal_moves, &mut legal_moves);
+
+        let board_hash = self.board.compute_zobrist_hash();
+        let board_repetition_count = {
+            let count_ref = self.board_repetition_counts.entry(board_hash).or_insert(0);
+            *count_ref += 1;
+            *count_ref
+        };
+
+        let game_state = self.board.check_game_state(legal_moves.is_empty(), board_repetition_count);
+
+        print!("{:?}\n\n", game_state)
+    }
+}

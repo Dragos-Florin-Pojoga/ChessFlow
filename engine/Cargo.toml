@@ -7,9 +7,9 @@ edition = "2021"
 console_error_panic_hook = { version = "0.1.7" }
 
 js-sys = { version = "0.3.77" }
-web-sys = { version = "0.3.77", features = ["console"], default-features=false }
+web-sys = { version = "0.3.77", features = ["console", "MessageEvent", "Window", "DedicatedWorkerGlobalScope"], default-features = false }
 
-wasm-bindgen = { version = "0.2.100", default-features=false }
+wasm-bindgen = { version = "0.2.100", default-features = false }
 wasm-bindgen-futures = { version = "0.4.50" }
 wasm-bindgen-spawn = { version = "0.0.1" }
 
@@ -17,7 +17,18 @@ console_log = { version = "1.0.0", features = ["color"] }
 log = { version = "0.4.27" }
 
 once_cell = { version = "1.21.3" }
+rand = { version = "0.9.1" }
+getrandom = { version = "0.3.3", features = ["wasm_js"] }
+flume = { version = "0.11.1" }
 
+tracing = { version = "0.1.41", optional = true }
+tracing-subscriber = { version = "0.3.19", optional = true }
+tracing-tracy = { version = "0.11.4", features = ["enable", "only-localhost", "flush-on-exit", "code-transfer"], optional = true }
+tracy-client = { version = "0.18.1", features = ["enable", "only-localhost", "flush-on-exit", "code-transfer"], optional = true }
+
+[features]
+default = []
+tracy = ["tracing", "tracing-subscriber", "tracing-tracy", "tracy-client"]
 
 
 [[bin]]
@@ -28,3 +39,10 @@ path = "src/native_main.rs"
 name = "wasm_engine"
 path = "src/wasm_main.rs"
 crate-type = [ "cdylib" ]
+
+
+[profile.release]
+# For smaller wasm artifacts:
+opt-level = "z"
+lto = true
+codegen-units = 1

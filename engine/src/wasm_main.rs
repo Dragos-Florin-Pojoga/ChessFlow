@@ -4,8 +4,7 @@ use chess_lib::*;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
 use std::{
-    cell::OnceCell,
-    sync::{atomic::AtomicUsize, Arc, Mutex},
+    cell::OnceCell, sync::{atomic::AtomicUsize, Arc, Mutex}
 };
 use js_sys::Function;
 use wasm_bindgen_spawn::ThreadCreator;
@@ -77,7 +76,10 @@ pub fn parse_and_execute_line(line: &str) -> String {
 }
 
 
-
+#[wasm_bindgen]
+pub fn debug() {
+    console::error_1(&"DEBUG".into());
+}
 
 
 
@@ -127,4 +129,31 @@ pub fn multithreading_test_stage_two() {
             Err(e) => log_str(&format!("Worker thread failed: {:?}", e)),
         }
     }
+}
+
+
+
+
+use wasm_bindgen::prelude::*;
+use js_sys::{ Reflect};
+use web_sys::window;
+use std::cell::RefCell;
+use web_sys::WorkerGlobalScope;
+use std::rc::Rc;
+
+
+#[wasm_bindgen]
+pub fn trigger_callback_from_rust(msg: &str) {
+    // Get the global scope (the WorkerGlobalScope in a Web Worker)
+    let global = js_sys::global()
+        .dyn_into::<web_sys::DedicatedWorkerGlobalScope>()
+        .expect("Failed to get DedicatedWorkerGlobalScope");
+
+    // Create a JavaScript object to send as a message
+    let message_obj = js_sys::Object::new();
+    js_sys::Reflect::set(&message_obj, &JsValue::from_str("type"), &JsValue::from_str("callback_trigger")).unwrap();
+    js_sys::Reflect::set(&message_obj, &JsValue::from_str("message"), &JsValue::from_str(msg)).unwrap();
+
+    // Post the message back to the main thread
+    global.post_message(&message_obj).expect("Failed to post message from worker");
 }
