@@ -52,12 +52,12 @@ impl Board {
             let pawn_attacks_bb = PRECOMPUTED.pawn_attacks[color as usize][from_sq.to_u8() as usize];
             let possible_captures = pawn_attacks_bb & opponent_bb;
             for to_sq in possible_captures.iter() {
-                 if to_sq.rank() == promotion_rank {
+                if to_sq.rank() == promotion_rank {
                     for &promo_piece in PieceType::PROMOTION_PIECES.iter() {
-                        moves.push(ChessMove::new(from_sq, to_sq, Some(promo_piece)));
+                        moves.push(ChessMove::new_capture(from_sq, to_sq, Some(promo_piece)));
                     }
                 } else {
-                    moves.push(ChessMove::new(from_sq, to_sq, None));
+                    moves.push(ChessMove::new_capture(from_sq, to_sq, None));
                 }
             }
             
@@ -65,7 +65,7 @@ impl Board {
             if let Some(ep_sq) = self.en_passant_square {
                 if from_sq.rank() == ep_rank { // Pawn must be on the correct rank for EP
                     if (pawn_attacks_bb & Bitboard::from_square(ep_sq)).is_not_empty() {
-                        moves.push(ChessMove::new(from_sq, ep_sq, None)); // NOTE: EP is a special capture but is not flagged in the move
+                        moves.push(ChessMove::new_capture(from_sq, ep_sq, None)); // NOTE: EP is a special capture but is not flagged in the move
                     }
                 }
             }
@@ -84,7 +84,10 @@ impl Board {
         for from_sq in pieces_bb.iter() {
             let attacks = attack_lut[from_sq.to_u8() as usize] & !friendly_bb; // Cannot move to friendly occupied square
             for to_sq in attacks.iter() {
-                moves.push(ChessMove::new(from_sq, to_sq, None));
+                let is_capture = self.occupied_bb.is_set(to_sq); // guaranteed to be opponent because of the above condition
+                let mut mv = ChessMove::new(from_sq, to_sq, None);
+                mv.is_capture = is_capture;
+                moves.push(mv);
             }
         }
     }
@@ -97,7 +100,10 @@ impl Board {
         let friendly_bb = self.color_bbs[color as usize];
         let king_normal_moves = PRECOMPUTED.king_attacks[from_sq.to_u8() as usize] & !friendly_bb;
         for to_sq in king_normal_moves.iter() {
-            moves.push(ChessMove::new(from_sq, to_sq, None));
+            let is_capture = self.occupied_bb.is_set(to_sq); // guaranteed to be opponent because of the above condition
+            let mut mv = ChessMove::new(from_sq, to_sq, None);
+            mv.is_capture = is_capture;
+            moves.push(mv);
         }
 
         // Castling
@@ -147,7 +153,10 @@ impl Board {
             
             let valid_moves = attacks & !friendly_bb; // Cannot move to friendly occupied square
             for to_sq in valid_moves.iter() {
-                moves.push(ChessMove::new(from_sq, to_sq, None));
+                let is_capture = self.occupied_bb.is_set(to_sq); // guaranteed to be opponent because of the above condition
+                let mut mv = ChessMove::new(from_sq, to_sq, None);
+                mv.is_capture = is_capture;
+                moves.push(mv);
             }
         }
     }
@@ -268,7 +277,7 @@ impl Board {
 
 impl Board {
     /// Makes a move on the board and returns a new board state.
-    pub fn make_move(&self, mv: &ChessMove) -> Board {
+    pub fn make_move(&self, mv: &ChessMove) -> Board { // TODO: make the move inplace and add option to undo
         let mut new_board = self.clone();
         let moving_piece_color = self.turn;
         let opponent_color = moving_piece_color.opponent();

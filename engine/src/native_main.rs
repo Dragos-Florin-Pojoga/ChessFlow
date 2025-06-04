@@ -18,8 +18,8 @@ fn main() {
     #[cfg(feature = "tracy")]
     tracing::event!(tracing::Level::INFO, "STARTING PROFILING");
 
-    let mut game = Game::new(7);
-    let mut depth = 4;
+    let mut game = Game::new(Board::new_start_pos(), 7);
+    let mut depth = 5;
 
     loop {
         #[cfg(feature = "tracy")]
@@ -28,6 +28,9 @@ fn main() {
         if let Some(cpu) = game.find_best_move(depth) {
             game.make_move(&cpu);
         } else {
+            break;
+        }
+        if game.get_game_state() != GameState::Ongoing {
             break;
         }
 

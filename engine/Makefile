@@ -18,6 +18,9 @@ build_web:
 	wasm-pack build -t no-modules --out-dir public/pkg --profiling --no-pack
 # TODO: optimised web builds?
 
+run_native_debug:
+	cargo build --bin native_engine
+	RUST_BACKTRACE=1 time cargo run --bin native_engine
 
 run_native:
 	cargo build --bin native_engine  --release

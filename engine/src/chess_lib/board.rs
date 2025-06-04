@@ -1,4 +1,5 @@
 pub use crate::bitboard::*;
+use crate::chess_lib::GameState;
 pub use crate::uci_parser::*;
 
 use std::fmt;
@@ -41,6 +42,17 @@ impl PieceType {
     pub const PROMOTION_PIECES: [PieceType; 4] = [
         PieceType::Queen, PieceType::Rook, PieceType::Bishop, PieceType::Knight
     ];
+
+    pub fn to_char(&self) -> char {
+        match self {
+            PieceType::Pawn => 'P',
+            PieceType::Knight => 'N',
+            PieceType::Bishop => 'B',
+            PieceType::Rook => 'R',
+            PieceType::Queen => 'Q',
+            PieceType::King => 'K',
+        }
+    }
 }
 
 
@@ -129,6 +141,7 @@ pub struct ChessMove {
     pub from: Square,
     pub to: Square,
     pub promotion: Option<PieceType>,
+    pub is_capture: bool,
 
     // pub moving_piece: PieceType,
     // pub captured_piece: Option<PieceType>,
@@ -141,7 +154,14 @@ pub struct ChessMove {
 impl ChessMove {
     #[inline]
     pub fn new(from: Square, to: Square, promotion: Option<PieceType>) -> Self {
-        Self { from, to, promotion }
+        Self { from, to, promotion, is_capture: false }
+    }
+    pub fn new_capture(from: Square, to: Square, promotion: Option<PieceType>) -> Self {
+        Self { from, to, promotion, is_capture: true }
+    }
+
+    pub fn is_capture(&self) -> bool {
+        self.is_capture
     }
 }
 
@@ -404,6 +424,19 @@ impl Board {
                 };
                 let pt = PieceType::ALL[pt_idx];
                 return Some((pt, color));
+            }
+        }
+        None
+        // unreachable!("Should not happen if occupied_bb is correct"); // FIXME?
+    }
+
+    pub fn piece_type_on_square(&self, sq: Square) -> Option<PieceType> {
+        if !self.occupied_bb.is_set(sq) {
+            return None;
+        }
+        for pt_idx in 0..6 {
+            if self.piece_bbs[pt_idx].is_set(sq) {
+                return Some(PieceType::ALL[pt_idx]);
             }
         }
         None
@@ -688,4 +721,191 @@ impl Board {
     //     }
     //     self.zobrist_hash
     // }
+}
+
+
+
+impl Board {
+    pub fn to_fen(&self) -> String {
+        let mut fen = String::new();
+
+        // Generate piece placement from rank 8 to 1
+        for rank in (0..8).rev() {
+            let mut empty = 0;
+            for file in 0..8 {
+                let sq_index = rank * 8 + file;
+                let mut found_piece = false;
+
+                for (i, bb) in self.piece_bbs.iter().enumerate() {
+                    if (bb.0 >> sq_index) & 1 == 1 {
+                        if empty > 0 {
+                            fen.push_str(&empty.to_string());
+                            empty = 0;
+                        }
+
+                        let piece_char = match i {
+                            0 => 'P',
+                            1 => 'N',
+                            2 => 'B',
+                            3 => 'R',
+                            4 => 'Q',
+                            5 => 'K',
+                            _ => unreachable!(),
+                        };
+
+                        let is_black = (self.color_bbs[1].0 >> sq_index) & 1 == 1;
+                        fen.push(if is_black { piece_char.to_ascii_lowercase() } else { piece_char });
+                        found_piece = true;
+                        break;
+                    }
+                }
+
+                if !found_piece {
+                    empty += 1;
+                }
+            }
+
+            if empty > 0 {
+                fen.push_str(&empty.to_string());
+            }
+
+            if rank != 0 {
+                fen.push('/');
+            }
+        }
+
+        // Active color
+        fen.push(' ');
+        fen.push(match self.turn {
+            Color::White => 'w',
+            Color::Black => 'b',
+        });
+
+        // Castling rights
+        fen.push(' ');
+        fen.push_str(&self.castling_rights.to_string());
+
+        // En passant square
+        fen.push(' ');
+        fen.push_str(match self.en_passant_square {
+            Some(ref sq) => sq.to_algebraic(),
+            None => "-".to_string(),
+        }
+        .as_str());
+
+        // Halfmove clock and fullmove number
+        fen.push(' ');
+        fen.push_str(&self.halfmove_clock.to_string());
+        fen.push(' ');
+        fen.push_str(&self.fullmove_number.to_string());
+
+        fen
+    }
+
+    
+    pub fn to_pgn(&self) -> String {
+        let fen = self.to_fen();
+        format!(
+            "[FEN \"{}\"]\n[SetUp \"1\"]\n\n*",
+            fen
+        )
+    }
+}
+
+use std::collections::HashMap;
+
+impl Board {
+    pub fn is_capture(&self, mv: &ChessMove) -> bool {
+        let to_mask = 1u64 << mv.to as usize;
+        let opponent_color = self.turn.opponent() as usize;
+        (self.color_bbs[opponent_color].0 & to_mask) != 0
+    }
+
+    pub fn is_check(&self) -> bool {
+        self.find_king_square(self.turn).map_or(false, |sq| self.is_square_attacked(sq, self.turn.opponent()))
+    }
+}
+
+impl Board {
+    pub fn to_san(&self, mv: &ChessMove, pseudo_legal_moves: &mut Vec<ChessMove>, legal_moves: &mut Vec<ChessMove>, board_repetition_counts: &mut HashMap<u64, u8>) -> String {
+        // Clone board to simulate the move
+        let mut board = self.clone();
+        let from = mv.from;
+        let to = mv.to;
+        let piece = board.piece_type_on_square(from).expect("No piece on from-square");
+
+        // Handle castling
+        if piece == PieceType::King {
+            let from_file = from.file();
+            let to_file = to.file();
+            if from_file == 4 && (to_file == 6 || to_file == 2) {
+                return if to_file == 6 { "O-O".to_string() } else { "O-O-O".to_string() };
+            }
+        }
+
+        let is_capture = board.is_capture(mv);
+        // let is_capture = mv.is_capture();
+        let mut san = String::new();
+
+        // Piece letter (empty for pawns)
+        if piece != PieceType::Pawn {
+            san.push(piece.to_char());
+        }
+
+        board.generate_legal_moves(pseudo_legal_moves, legal_moves);
+
+        // Disambiguation
+        let ambiguous = pseudo_legal_moves
+            .into_iter()
+            .filter(|m| m.to == mv.to && *m != mv && board.piece_type_on_square(m.from) == Some(piece))
+            .collect::<Vec<_>>();
+        if !ambiguous.is_empty() {
+            let from_file = from.file();
+            let from_rank = from.rank();
+
+            let file_needed = ambiguous.iter().any(|m| m.from.file() != from_file);
+            let rank_needed = ambiguous.iter().any(|m| m.from.rank() != from_rank);
+
+            if file_needed {
+                san.push((b'a' + from_file) as char);
+            }
+            if rank_needed || !file_needed {
+                san.push((b'1' + from_rank) as char);
+            }
+        }
+
+        // Capture
+        if is_capture {
+            if piece == PieceType::Pawn {
+                san.push((b'a' + from.file()) as char);
+            }
+            san.push('x');
+        }
+
+        // Destination
+        san.push_str(&to.to_algebraic());
+
+        // Promotion
+        if let Some(promo) = mv.promotion {
+            san.push('=');
+            san.push(promo.to_char());
+        }
+
+        // Simulate move to check for check or mate
+        board = board.make_move(mv);
+
+        let board_repetition_count = *board_repetition_counts.entry(board.compute_zobrist_hash()).or_insert(0) + 1;
+
+        board.generate_legal_moves(pseudo_legal_moves, legal_moves);
+
+        let game_state = board.check_game_state(legal_moves.is_empty(), board_repetition_count);
+
+        if let GameState::Checkmate(_) = game_state {
+            san.push('#');
+        } else if board.is_check() {
+            san.push('+');
+        }
+
+        san
+    }
 }

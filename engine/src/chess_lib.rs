@@ -30,3 +30,6 @@ pub use evaluate::*;
 
 pub mod search;
 pub use search::*;
+
+pub mod game;
+pub use game::*;
