@@ -1,237 +1,306 @@
 use crate::board::*;
 use crate::terminal_states::*;
 use crate::game::*;
-use std::cmp::max;
-use std::cmp::min;
+use std::cmp::{max, min};
 
+
+pub fn get_qsearch_piece_value(piece_type: PieceType) -> i32 {
+    match piece_type {
+        PieceType::Pawn => 100,
+        PieceType::Knight => 320,
+        PieceType::Bishop => 330,
+        PieceType::Rook => 500,
+        PieceType::Queen => 900,
+        PieceType::King => 0,
+    }
+}
 
 impl Game {
     /// The Alpha-Beta search algorithm.
-    ///
-    /// This function recursively searches the game tree to find the best move.
-    /// It uses Alpha-Beta pruning to cut off branches that cannot possibly lead
-    /// to a better score than already found.
-    ///
-    /// Arguments:
-    /// - `board`: The current board state.
-    /// - `depth`: The remaining search depth.
-    /// - `alpha`: The alpha value (best score found so far for the maximizing player).
-    /// - `beta`: The beta value (best score found so far for the minimizing player).
-    ///
-    /// Returns: The evaluated score for the current board state.
     #[cfg_attr(feature = "tracy", tracing::instrument(skip_all))]
     pub fn alphabeta(&mut self, board: Board, depth: u8, mut alpha: i32, mut beta: i32) -> i32 {
-        let original_alpha = alpha; // Store original alpha for transposition table entry
+        let original_alpha = alpha;
         let board_hash = board.compute_zobrist_hash();
 
-        // 1. Update board repetition count for the current hash.
-        // This must happen *before* any repetition check or TT lookup that might skip it.
         let board_repetition_count = {
             let count_ref = self.board_repetition_counts.entry(board_hash).or_insert(0);
             *count_ref += 1;
             *count_ref
         };
 
-        // 2. Immediate Repetition Draw Check
-        // If the current position is a threefold repetition, it's a draw regardless of search depth.
         if board_repetition_count >= 3 {
-            // Decrement repetition count before returning.
             *self.board_repetition_counts.get_mut(&board_hash).unwrap() -= 1;
-            // Store this draw in the transposition table.
             self.transposition_table.insert(
                 board_hash,
                 TTEntry {
-                    score: 0, // Draw score
-                    depth,
-                    node_type: NodeType::Exact,
-                    best_move: None,
+                    score: 0, depth, node_type: NodeType::Exact, best_move: None,
                 },
             );
-            return 0; // Return draw score
+            return 0;
         }
 
-        // 3. Transposition Table Lookup (after repetition check)
-        // Check if this position has been searched before at a sufficient depth.
-        // Suggested Fix Sketch for TT section in alphabeta:
         if let Some(entry) = self.transposition_table.get(&board_hash) {
             if entry.depth >= depth {
+                // Check if TT hit causes immediate return
                 let mut tt_causes_return = false;
-                let mut score_from_tt = entry.score;
+                let score_from_tt = entry.score;
 
                 match entry.node_type {
-                    NodeType::Exact => {
-                        tt_causes_return = true;
-                    }
+                    NodeType::Exact => tt_causes_return = true,
                     NodeType::Alpha => { // TT score is a lower bound
-                        if entry.score >= beta { // This lower bound causes a cutoff
-                            tt_causes_return = true;
-                            score_from_tt = entry.score; // Or beta
-                        }
+                        if entry.score >= beta { tt_causes_return = true; }
                         alpha = max(alpha, entry.score);
                     }
                     NodeType::Beta => { // TT score is an upper bound
-                        if entry.score <= alpha { // This upper bound causes a cutoff
-                            tt_causes_return = true;
-                            score_from_tt = entry.score; // Or alpha
-                        }
+                        if entry.score <= alpha { tt_causes_return = true; }
                         beta = min(beta, entry.score);
                     }
                 }
 
                 if tt_causes_return {
-                    *self.board_repetition_counts.get_mut(&board_hash).unwrap() -= 1; // Decrement only if returning
-                    // Potentially update TT entry here before returning
+                    *self.board_repetition_counts.get_mut(&board_hash).unwrap() -= 1;
                     return score_from_tt;
                 }
-                // If not returning, alpha/beta might have been updated.
-                // The repetition count remains (correctly) incremented from the function start.
-                // Check if the updated alpha/beta now cause a cutoff.
+                // If TT only updated bounds, check if they now cross
                 if alpha >= beta {
-                    *self.board_repetition_counts.get_mut(&board_hash).unwrap() -= 1; // Decrement before this return path
-                    // This return uses the score from the TT entry that caused the bounds to cross,
-                    // which is `entry.score` (the value that was just assigned to alpha or beta to cause the cutoff).
+                     *self.board_repetition_counts.get_mut(&board_hash).unwrap() -= 1;
+                    // Return the TT score that caused the cutoff
                     return entry.score;
                 }
             }
         }
 
-        // Retrieve move containers for the current depth to avoid reallocations.
         let mut pseudo_legal_moves = std::mem::take(&mut self.pseudo_legal_moves_container[depth as usize]);
         let mut legal_moves = std::mem::take(&mut self.legal_moves_container[depth as usize]);
-
-        // Generate legal moves for the current board.
         board.generate_legal_moves(&mut pseudo_legal_moves, &mut legal_moves);
 
-        // Determine the game state (ongoing, checkmate, stalemate, draw).
-        // Note: Repetition draw is already handled above. This is for checkmate/stalemate.
         let game_state = board.check_game_state(legal_moves.is_empty(), board_repetition_count);
 
         // 4. Base Case (Terminal Node - other than repetition draw)
-        // If search depth is 0, game is over (checkmate/stalemate), or no legal moves.
-        if depth == 0 || game_state != GameState::Ongoing || legal_moves.is_empty() {
-            // Evaluate the board statically.
-            // IMPORTANT: `board.evaluate` must correctly handle `GameState::Checkmate` (return +/- infinity)
-            // and `GameState::Stalemate`/Draws (return 0).
+        if game_state != GameState::Ongoing {
             let eval = board.evaluate(depth, &mut pseudo_legal_moves, &mut legal_moves, game_state);
-
-            // Decrement repetition count before returning.
             *self.board_repetition_counts.get_mut(&board_hash).unwrap() -= 1;
-            // Return move containers to their respective slots.
             self.pseudo_legal_moves_container[depth as usize] = pseudo_legal_moves;
             self.legal_moves_container[depth as usize] = legal_moves;
-
-            // Store result in transposition table.
-            let node_type = if eval <= original_alpha {
-                NodeType::Alpha // Score is a lower bound (failed low)
-            } else if eval >= beta {
-                NodeType::Beta // Score is an upper bound (failed high)
-            } else {
-                NodeType::Exact // Exact score
-            };
+            let node_type = if eval <= original_alpha { NodeType::Alpha }
+                            else if eval >= beta { NodeType::Beta }
+                            else { NodeType::Exact };
             self.transposition_table.insert(
                 board_hash,
-                TTEntry {
-                    score: eval,
-                    depth,
-                    node_type,
-                    best_move: None, // No best move for terminal nodes
-                },
+                TTEntry { score: eval, depth, node_type, best_move: None },
             );
             return eval;
         }
 
-        // 5. Move Ordering
-        // Get the best move from the transposition table (if available) to try first.
+        // 4b. Base Case: Depth Limit Reached (but game is ongoing) -> Call Quiescence Search
+        if depth == 0 {
+            // Quiescence search will perform its own evaluation.
+            // The `board` is passed by value to qsearch.
+            // `alpha` and `beta` are passed along.
+            let q_score = self.qsearch(board, alpha, beta, self.q_search_max_ply);
+
+            // Cleanup for the depth 0 node of alphabeta
+            *self.board_repetition_counts.get_mut(&board_hash).unwrap() -= 1;
+            // Return the original containers, qsearch doesn't use these specific instances
+            self.pseudo_legal_moves_container[depth as usize] = pseudo_legal_moves;
+            self.legal_moves_container[depth as usize] = legal_moves;
+
+            let node_type_for_tt = if q_score <= original_alpha { NodeType::Alpha }
+                                   else if q_score >= beta { NodeType::Beta }
+                                   else { NodeType::Exact };
+            self.transposition_table.insert(
+                board_hash,
+                TTEntry {
+                    score: q_score,
+                    depth, // depth is 0 here
+                    node_type: node_type_for_tt,
+                    best_move: None, // No single "best move" from qsearch evaluation
+                },
+            );
+            return q_score;
+        }
+
+        // 5. Move Ordering (for depth > 0)
         let tt_best_move = self.transposition_table.get(&board_hash).and_then(|entry| entry.best_move);
-        // Sort legal moves based on their heuristic score (descending).
         legal_moves.sort_unstable_by_key(|mv| -self.score_move(mv, depth, tt_best_move));
 
         let mut result_value;
-        let mut best_move_for_tt: Option<ChessMove> = None; // To store the best move found in this node for TT
+        let mut best_move_for_tt: Option<ChessMove> = None;
 
         // 6. Alpha-Beta Search Loop
         if board.turn == Color::White { // Maximizing player
-            let mut value = i32::MIN;
+            let mut value = i32::MIN; // Negative infinity
             for mv in &legal_moves {
                 let new_board = board.make_move(&mv);
                 let score = self.alphabeta(new_board, depth - 1, alpha, beta);
                 if score > value {
                     value = score;
-                    best_move_for_tt = Some(*mv); // Update best move
+                    best_move_for_tt = Some(*mv);
                 }
-                alpha = max(alpha, value); // Update alpha
+                alpha = max(alpha, value);
                 if alpha >= beta {
-                    // Beta cutoff (fail-high): Current move is too good for the opponent.
-                    // Store this move as a killer move and update history.
-                    if !mv.is_capture() { // Only for non-capture moves
-                        let current_killer_moves = &mut self.killer_moves[depth as usize];
-                        if current_killer_moves[0].is_none() || current_killer_moves[0] != Some(*mv) {
-                            current_killer_moves[1] = current_killer_moves[0]; // Shift existing killer
-                            current_killer_moves[0] = Some(*mv);              // New killer move
-                        }
-                        // Update history score for this move. Higher depth cutoffs are more valuable.
-                        self.history_moves[mv.from as usize][mv.to as usize] += depth as i32;
-                    }
-                    break; // Prune the rest of the branches
-                }
-            }
-            result_value = value;
-        } else { // Color::Black (Minimizing player)
-            let mut value = i32::MAX;
-            for mv in &legal_moves {
-                let new_board = board.make_move(&mv);
-                let score = self.alphabeta(new_board, depth - 1, alpha, beta);
-                if score < value {
-                    value = score;
-                    best_move_for_tt = Some(*mv); // Update best move
-                }
-                beta = min(beta, value); // Update beta
-                if beta <= alpha {
-                    // Alpha cutoff (fail-low): Current move is too bad for us.
-                    // Store this move as a killer move and update history.
-                    if !mv.is_capture() { // Only for non-capture moves
+                    if !mv.is_capture() {
                         let current_killer_moves = &mut self.killer_moves[depth as usize];
                         if current_killer_moves[0].is_none() || current_killer_moves[0] != Some(*mv) {
                             current_killer_moves[1] = current_killer_moves[0];
                             current_killer_moves[0] = Some(*mv);
                         }
-                        // Update history score for this move.
-                        self.history_moves[mv.from as usize][mv.to as usize] += depth as i32;
+                        self.history_moves[mv.from() as usize][mv.to() as usize] += depth as i32;
                     }
-                    break; // Prune the rest of the branches
+                    break;
+                }
+            }
+            result_value = value;
+        } else { // Color::Black (Minimizing player)
+            let mut value = i32::MAX; // Positive infinity
+            for mv in &legal_moves {
+                let new_board = board.make_move(&mv);
+                let score = self.alphabeta(new_board, depth - 1, alpha, beta);
+                if score < value {
+                    value = score;
+                    best_move_for_tt = Some(*mv);
+                }
+                beta = min(beta, value);
+                if beta <= alpha {
+                    if !mv.is_capture() {
+                        let current_killer_moves = &mut self.killer_moves[depth as usize];
+                        if current_killer_moves[0].is_none() || current_killer_moves[0] != Some(*mv) {
+                            current_killer_moves[1] = current_killer_moves[0];
+                            current_killer_moves[0] = Some(*mv);
+                        }
+                        self.history_moves[mv.from() as usize][mv.to() as usize] += depth as i32;
+                    }
+                    break;
                 }
             }
             result_value = value;
         }
 
         // 7. Cleanup and Transposition Table Store
-        // Decrement repetition count for the current hash.
         *self.board_repetition_counts.get_mut(&board_hash).unwrap() -= 1;
-        // Return move containers to their respective slots.
         self.pseudo_legal_moves_container[depth as usize] = pseudo_legal_moves;
         self.legal_moves_container[depth as usize] = legal_moves;
 
-        // Store result in transposition table.
-        let node_type = if result_value <= original_alpha {
-            NodeType::Alpha
-        } else if result_value >= beta {
-            NodeType::Beta
-        } else {
-            NodeType::Exact
-        };
+        let node_type = if result_value <= original_alpha { NodeType::Alpha }
+                        else if result_value >= beta { NodeType::Beta }
+                        else { NodeType::Exact };
         self.transposition_table.insert(
             board_hash,
             TTEntry {
-                score: result_value,
-                depth,
-                node_type,
-                best_move: best_move_for_tt,
+                score: result_value, depth, node_type, best_move: best_move_for_tt,
             },
         );
 
         result_value
     }
 
+    /// Quiescence Search: Explores tactical moves (captures, promotions) from a given position.
+    #[cfg_attr(feature = "tracy", tracing::instrument(skip_all))]
+    fn qsearch(
+        &mut self,
+        board: Board, // Current board state for this qsearch node
+        mut alpha: i32,
+        mut beta: i32,
+        q_depth: u8, // Remaining quiescence search depth
+    ) -> i32 {
+        // 1. Check quiescence depth limit
+        if q_depth == 0 {
+            // Depth limit reached, return static evaluation of the current position.
+            // For `board.evaluate`, `game_state` is `Ongoing` because qsearch is only
+            // entered if the main search determined the game is ongoing.
+            // `remaining_depth` for evaluate's own logic can be 0.
+            let mut temp_pseudo = Vec::new(); // Placeholder if evaluate needs them for mobility
+            let mut temp_legal = Vec::new();  // Placeholder
+            // If evaluate *needs* accurate mobility for stand-pat, generate moves for `board` here:
+            // board.generate_legal_moves(&mut temp_pseudo, &mut temp_legal);
+            return board.evaluate(0, &mut temp_pseudo, &mut temp_legal, GameState::Ongoing);
+        }
+
+        // 2. Stand-pat evaluation
+        // Score if the current player makes no tactical move.
+        // For an accurate stand-pat that includes mobility, generate all legal moves for the current `board`.
+        let mut stand_pat_pseudo_moves = Vec::new();
+        let mut stand_pat_legal_moves = Vec::new();
+        let stand_pat_score = board.evaluate(0, &mut stand_pat_pseudo_moves, &mut stand_pat_legal_moves, GameState::Ongoing);
+        board.generate_legal_moves(&mut stand_pat_pseudo_moves, &mut stand_pat_legal_moves);
+
+
+        // 3. Alpha-Beta pruning based on stand-pat
+        // This is the score that can be achieved if no tactical sequence improves it.
+        if board.turn == Color::White { // Maximizing player
+            if stand_pat_score >= beta {
+                return stand_pat_score; // Fail-high: stand-pat is already too good for opponent
+            }
+            alpha = max(alpha, stand_pat_score);
+        } else { // Minimizing player (Black)
+            if stand_pat_score <= alpha {
+                return stand_pat_score; // Fail-low: stand-pat is already too good for us
+            }
+            beta = min(beta, stand_pat_score);
+        }
+
+        // 4. Generate and score tactical moves (captures, promotions)
+        // `stand_pat_legal_moves` already contains all legal moves for the current `board`.
+        // We filter these for tactical moves.
+        let mut tactical_moves = stand_pat_legal_moves; // Start with all legal moves
+        tactical_moves.retain(|mv| mv.is_capture() || mv.promotion().is_some()); // Keep only captures/promotions
+
+        // Order tactical moves: Promotions first, then MVV-LVA for captures.
+        // Higher score_key means better move.
+        tactical_moves.sort_unstable_by_key(|mv| {
+            let mut score_key = 0;
+            if let Some(promoted_piece) = mv.promotion() {
+                score_key += 10000 + get_qsearch_piece_value(promoted_piece); // Promotions are high priority
+            }
+            if mv.is_capture() {
+                // MVV-LVA: Most Valuable Victim - Least Valuable Attacker
+                // A higher score_key for more valuable captures.
+                if let Some(victim_piece_info) = board.piece_on_square(mv.to()) { // Assumes piece_on_square returns Option<(PieceType, Color)>
+                    score_key += get_qsearch_piece_value(victim_piece_info.0) * 10; // Victim value weighted higher
+                    if let Some(attacker_piece_info) = board.piece_on_square(mv.from()) {
+                        score_key -= get_qsearch_piece_value(attacker_piece_info.0); // Subtract attacker value
+                    }
+                } else {
+                    // Should not happen for a valid capture, but as a fallback
+                    score_key += 50; // Generic capture bonus
+                }
+            }
+            -score_key // Negate because sort_unstable_by_key sorts by ascending key
+        });
+
+        // 5. Iterate through tactical moves
+        if board.turn == Color::White { // Maximizing player
+            let mut current_best_score = stand_pat_score; // Initialize with stand-pat
+            for mv in &tactical_moves {
+                let new_board = board.make_move(&mv);
+                // Recursively call qsearch for the new board state
+                let score = self.qsearch(new_board, alpha, beta, q_depth - 1);
+                current_best_score = max(current_best_score, score);
+                alpha = max(alpha, current_best_score);
+                if alpha >= beta {
+                    break; // Beta cutoff
+                }
+            }
+            return current_best_score;
+        } else { // Minimizing player (Black)
+            let mut current_best_score = stand_pat_score; // Initialize with stand-pat
+            for mv in &tactical_moves {
+                let new_board = board.make_move(&mv);
+                // Recursively call qsearch for the new board state
+                let score = self.qsearch(new_board, alpha, beta, q_depth - 1);
+                current_best_score = min(current_best_score, score);
+                beta = min(beta, current_best_score);
+                if beta <= alpha {
+                    break; // Alpha cutoff
+                }
+            }
+            return current_best_score;
+        }
+    }
+}
+
+
+impl Game {
     /// Scores a chess move based on various heuristics for move ordering.
     /// Higher scores mean the move should be tried earlier.
     ///
@@ -261,8 +330,8 @@ impl Game {
         ];
 
         if mv.is_capture() {
-            let victim = self.board.piece_on_square(mv.to);
-            let attacker = self.board.piece_on_square(mv.from);
+            let victim = self.board.piece_on_square(mv.to());
+            let attacker = self.board.piece_on_square(mv.from());
 
             match (victim, attacker) {
                 (Some(victim_piece), Some(attacker_piece)) => {
@@ -271,7 +340,7 @@ impl Game {
                 },
                 _ => 0, // Should ideally not happen for a legal capture, but a fallback.
             }
-        } else if let Some(_) = mv.promotion {
+        } else if let Some(_) = mv.promotion() {
             // 3. Promotions (high priority)
             1_000_000 // High score for promotions
         } else {
@@ -292,7 +361,7 @@ impl Game {
             }
 
             // History heuristic: Score based on past success of this move in causing cutoffs
-            score += self.history_moves[mv.from as usize][mv.to as usize];
+            score += self.history_moves[mv.from() as usize][mv.to() as usize];
 
             // 5. Check-giving moves (Optional, requires `board.is_check_after_move` or similar)
             // if self.board.is_check_after_move(mv) {
@@ -312,7 +381,7 @@ impl Game {
     #[cfg_attr(feature = "tracy", tracing::instrument(skip_all))]
     pub fn find_best_move(&mut self, depth: u8) -> Option<ChessMove> {
         // Error check for initial search depth.
-        if depth as usize > self.max_search_depth {
+        if depth > self.max_search_depth {
             eprintln!("Error: Initial search depth ({}) exceeds the engine's configured max_depth ({}).", depth, self.max_search_depth);
             return None;
         }

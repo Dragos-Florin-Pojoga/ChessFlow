@@ -18,7 +18,7 @@ fn main() {
     #[cfg(feature = "tracy")]
     tracing::event!(tracing::Level::INFO, "STARTING PROFILING");
 
-    let mut game = Game::new(Board::new_start_pos(), 7);
+    let mut game = Game::new(Board::new_start_pos(), 7, 3);
     let mut depth = 5;
 
     loop {

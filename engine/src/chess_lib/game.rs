@@ -30,17 +30,18 @@ pub struct Game {
     pub pseudo_legal_moves_container: Vec<Vec<ChessMove>>,
     pub legal_moves_container: Vec<Vec<ChessMove>>,
     pub board_repetition_counts: HashMap<u64, u8>,
-    pub max_search_depth: usize,
     pub transposition_table: HashMap<u64, TTEntry>,
     pub killer_moves: Vec<[Option<ChessMove>; 2]>, // Two killer moves per depth
     pub history_moves: [[i32; 64]; 64], // History table for non-capture moves (from_square_index, to_square_index) -> score
+    pub max_search_depth: u8,
+    pub q_search_max_ply: u8,
 }
 
 impl Game {
-    pub fn new(board: Board, max_depth: usize) -> Self {
-        let mut pseudo_legal_moves_container = Vec::with_capacity(max_depth + 1);
-        let mut legal_moves_container = Vec::with_capacity(max_depth + 1);
-        let mut killer_moves = Vec::with_capacity(max_depth + 1);
+    pub fn new(board: Board, max_depth: u8, q_search_max_ply: u8) -> Self {
+        let mut pseudo_legal_moves_container = Vec::with_capacity(max_depth as usize + 1);
+        let mut legal_moves_container = Vec::with_capacity(max_depth as usize + 1);
+        let mut killer_moves = Vec::with_capacity(max_depth as usize + 1);
         for _ in 0..=max_depth {
             pseudo_legal_moves_container.push(Vec::new());
             legal_moves_container.push(Vec::new());
@@ -58,6 +59,7 @@ impl Game {
             transposition_table: HashMap::new(),
             killer_moves: killer_moves,
             history_moves: [[0; 64]; 64], // Initialize history table
+            q_search_max_ply,
         }
     }
 

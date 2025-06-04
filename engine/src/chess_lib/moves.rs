@@ -86,7 +86,7 @@ impl Board {
             for to_sq in attacks.iter() {
                 let is_capture = self.occupied_bb.is_set(to_sq); // guaranteed to be opponent because of the above condition
                 let mut mv = ChessMove::new(from_sq, to_sq, None);
-                mv.is_capture = is_capture;
+                mv.set_capture(is_capture);
                 moves.push(mv);
             }
         }
@@ -102,7 +102,7 @@ impl Board {
         for to_sq in king_normal_moves.iter() {
             let is_capture = self.occupied_bb.is_set(to_sq); // guaranteed to be opponent because of the above condition
             let mut mv = ChessMove::new(from_sq, to_sq, None);
-            mv.is_capture = is_capture;
+            mv.set_capture(is_capture);
             moves.push(mv);
         }
 
@@ -155,7 +155,7 @@ impl Board {
             for to_sq in valid_moves.iter() {
                 let is_capture = self.occupied_bb.is_set(to_sq); // guaranteed to be opponent because of the above condition
                 let mut mv = ChessMove::new(from_sq, to_sq, None);
-                mv.is_capture = is_capture;
+                mv.set_capture(is_capture);
                 moves.push(mv);
             }
         }
@@ -283,7 +283,7 @@ impl Board {
         let opponent_color = moving_piece_color.opponent();
 
         // 1. Identify the piece being moved on the original board
-        let (moving_piece_type, _) = self.piece_on_square(mv.from)
+        let (moving_piece_type, _) = self.piece_on_square(mv.from())
             .expect("There should be a piece on the 'from' square");
 
         // Reset en passant square for the next turn unless it's a pawn double push
@@ -304,7 +304,7 @@ impl Board {
         // 2. Handle Captures (including En Passant)
         let captured_piece_sq = if let Some(ep_sq) = self.en_passant_square {
             // Check for En Passant Capture: Is it a pawn moving to the EP square?
-            if moving_piece_type == PieceType::Pawn && mv.to == ep_sq {
+            if moving_piece_type == PieceType::Pawn && mv.to() == ep_sq {
                 // The captured pawn is on the rank of the EP square, same file as the EP square
                 let captured_pawn_sq = match moving_piece_color {
                     Color::White => ep_sq.try_offset(0, -1).unwrap(), // Captured black pawn is one rank below EP square
@@ -320,15 +320,15 @@ impl Board {
                 Some(captured_pawn_sq) // Indicate a piece was captured (for occupied_bb update)
             } else {
                 // Not an en passant move, check for standard capture at destination
-                if self.occupied_bb.is_set(mv.to) {
-                    if let Some((captured_pt, captured_color)) = self.piece_on_square(mv.to) {
-                         // Standard capture
-                         new_board.piece_bbs[captured_pt as usize].clear(mv.to);
-                         new_board.color_bbs[captured_color as usize].clear(mv.to);
-                         new_board.halfmove_clock = 0; // Capture resets halfmove clock
-                         Some(mv.to) // Indicate a piece was captured
+                if self.occupied_bb.is_set(mv.to()) {
+                    if let Some((captured_pt, captured_color)) = self.piece_on_square(mv.to()) {
+                        // Standard capture
+                        new_board.piece_bbs[captured_pt as usize].clear(mv.to());
+                        new_board.color_bbs[captured_color as usize].clear(mv.to());
+                        new_board.halfmove_clock = 0; // Capture resets halfmove clock
+                        Some(mv.to()) // Indicate a piece was captured
                     } else {
-                         None // Should not happen if occupied_bb is correct
+                        None // Should not happen if occupied_bb is correct
                     }
                 } else {
                     None // No capture
@@ -336,15 +336,15 @@ impl Board {
             }
         } else {
             // No en passant square was set, check for standard capture at destination
-             if self.occupied_bb.is_set(mv.to) {
-                if let Some((captured_pt, captured_color)) = self.piece_on_square(mv.to) {
-                     // Standard capture
-                     new_board.piece_bbs[captured_pt as usize].clear(mv.to);
-                     new_board.color_bbs[captured_color as usize].clear(mv.to);
-                     new_board.halfmove_clock = 0; // Capture resets halfmove clock
-                     Some(mv.to) // Indicate a piece was captured
+             if self.occupied_bb.is_set(mv.to()) {
+                if let Some((captured_pt, captured_color)) = self.piece_on_square(mv.to()) {
+                    // Standard capture
+                    new_board.piece_bbs[captured_pt as usize].clear(mv.to());
+                    new_board.color_bbs[captured_color as usize].clear(mv.to());
+                    new_board.halfmove_clock = 0; // Capture resets halfmove clock
+                    Some(mv.to()) // Indicate a piece was captured
                 } else {
-                     None // Should not happen if occupied_bb is correct
+                    None // Should not happen if occupied_bb is correct
                 }
             } else {
                 None // No capture
@@ -353,26 +353,26 @@ impl Board {
         
         // 3. Move the piece
         // Remove from 'from' square
-        new_board.piece_bbs[moving_piece_type as usize].clear(mv.from);
-        new_board.color_bbs[moving_piece_color as usize].clear(mv.from);
+        new_board.piece_bbs[moving_piece_type as usize].clear(mv.from());
+        new_board.color_bbs[moving_piece_color as usize].clear(mv.from());
         // Add to 'to' square
-        new_board.piece_bbs[moving_piece_type as usize].set(mv.to);
-        new_board.color_bbs[moving_piece_color as usize].set(mv.to);
+        new_board.piece_bbs[moving_piece_type as usize].set(mv.to());
+        new_board.color_bbs[moving_piece_color as usize].set(mv.to());
 
         // 4. Handle Special Moves (Promotion, Castling)
 
         // Promotion
-        if let Some(promoted_piece_type) = mv.promotion {
+        if let Some(promoted_piece_type) = mv.promotion() {
             // Remove the pawn that arrived at the promotion square
-            new_board.piece_bbs[PieceType::Pawn as usize].clear(mv.to);
+            new_board.piece_bbs[PieceType::Pawn as usize].clear(mv.to());
             // Add the promoted piece
-            new_board.piece_bbs[promoted_piece_type as usize].set(mv.to);
+            new_board.piece_bbs[promoted_piece_type as usize].set(mv.to());
         }
 
         // Castling (handled by checking King move of 2 squares horizontally)
-        if moving_piece_type == PieceType::King && (mv.to.file() as i8 - mv.from.file() as i8).abs() == 2 {
+        if moving_piece_type == PieceType::King && (mv.to().file() as i8 - mv.from().file() as i8).abs() == 2 {
             // This is a castling move, move the corresponding rook
-            match (moving_piece_color, mv.to) {
+            match (moving_piece_color, mv.to()) {
                 (Color::White, Square::G1) => { // White Kingside Castle
                     let rook_from = Square::H1;
                     let rook_to = Square::F1;
@@ -425,7 +425,7 @@ impl Board {
         }
         // Moving a rook from its starting square removes that side's castling right
         if moving_piece_type == PieceType::Rook {
-            match mv.from {
+            match mv.from() {
                 Square::A1 => new_board.castling_rights.remove_right(CastlingRights::WHITE_QUEENSIDE),
                 Square::H1 => new_board.castling_rights.remove_right(CastlingRights::WHITE_KINGSIDE),
                 Square::A8 => new_board.castling_rights.remove_right(CastlingRights::BLACK_QUEENSIDE),
@@ -450,13 +450,13 @@ impl Board {
 
 
         // 6. Set En Passant Square for the next turn if it was a pawn double push
-        if moving_piece_type == PieceType::Pawn && (mv.from.rank() as i8 - mv.to.rank() as i8).abs() == 2 {
+        if moving_piece_type == PieceType::Pawn && (mv.from().rank() as i8 - mv.to().rank() as i8).abs() == 2 {
             let ep_rank = match moving_piece_color {
                 Color::White => 2, // White pawn moved from rank 1 to 3, EP target is rank 2
                 Color::Black => 5, // Black pawn moved from rank 6 to 4, EP target is rank 5
             };
             // The EP target square is on the file of the destination square, at the EP rank
-            new_board.en_passant_square = Some(Square::from_file_rank(mv.to.file(), ep_rank));
+            new_board.en_passant_square = Some(Square::from_file_rank(mv.to().file(), ep_rank));
         }
 
 
@@ -481,12 +481,12 @@ impl Board {
         for mv in pseudo_legal_moves.iter() {
             // Special handling for castling: check squares king passes through
             // This is a bit tricky as pseudo-legal castling only checks empty squares, not attacks.
-            let is_castle_move = self.piece_bbs[PieceType::King as usize].is_set(mv.from) &&
-                                 (mv.to.file() as i8 - mv.from.file() as i8).abs() == 2;
+            let is_castle_move = self.piece_bbs[PieceType::King as usize].is_set(mv.from()) &&
+                                 (mv.to().file() as i8 - mv.from().file() as i8).abs() == 2;
 
             if is_castle_move {
-                let king_start_sq = mv.from;
-                let king_mid_sq = if mv.to.file() > king_start_sq.file() { // Kingside
+                let king_start_sq = mv.from();
+                let king_mid_sq = if mv.to().file() > king_start_sq.file() { // Kingside
                     king_start_sq.try_offset(1,0).unwrap()
                 } else { // Queenside
                     king_start_sq.try_offset(-1,0).unwrap()
