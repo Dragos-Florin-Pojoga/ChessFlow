@@ -50,7 +50,7 @@ function GameInfo() {
     const [bestLine, setBestline] = useState("");
     const [possibleMate, setPossibleMate] = useState("");
     const findBestMove = () => {
-        engine.evaluatePosition(chessBoardPosition, 18);;
+        engine.evaluatePosition(chessBoardPosition, 18);
         engine.onMessage(({
             positionEvaluation,
             possibleMate: newMate,
@@ -67,8 +67,6 @@ function GameInfo() {
             } else {
                 setPossibleMate("");
             }
-
-            console.log(positionEvaluation);
 
             if (newDepth) setDepth(newDepth);
             if (pv) setBestline(pv);
