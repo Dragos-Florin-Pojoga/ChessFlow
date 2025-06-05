@@ -50,16 +50,13 @@ function GameInfo() {
     const [bestLine, setBestline] = useState("");
     const [possibleMate, setPossibleMate] = useState("");
     const findBestMove = () => {
-        console.log("test");
         engine.evaluatePosition(chessBoardPosition, 18);
-        console.log("test2");
         engine.onMessage(({
             positionEvaluation,
             possibleMate: newMate,
             pv,
             depth: newDepth
         }) => {
-            console.log("test3");
             if (depth && depth < 10) return;
             if (positionEvaluation) {
                 const numericEval = (engineGame.turn() === "w" ? 1 : -1) * Number(positionEvaluation) / 100;
@@ -180,7 +177,7 @@ function GameInfo() {
                         <h5>Start time: {new Date(game.startTime).toString()}</h5>
                         <PlayerInfoCard
                             key={boardOrientation === "white" ? "white" : "black"} 
-                            gameID={toString(gameID)}
+                            gameID={Number(gameID)}
                             {...getPlayerCardInfo(true)} // Top
                         />
                         <div className="eval-container">
@@ -204,7 +201,7 @@ function GameInfo() {
                         </div>
                         <PlayerInfoCard
                             key={boardOrientation === "white" ? "black" : "white"} 
-                            gameID={toString(gameID)}
+                            gameID={Number(gameID)}
                             {...getPlayerCardInfo(false)} // Bottom
                         />
                         <button className="flip-button-container2" onClick={() => { setBoardOrientation(boardOrientation === "white" ? "black" : "white"); }}>Flip orientation</button>
