@@ -50,17 +50,17 @@ function GameInfo() {
     const [bestLine, setBestline] = useState("");
     const [possibleMate, setPossibleMate] = useState("");
     const findBestMove = () => {
-        console.log("test");
+        engine.stop();
         engine.evaluatePosition(chessBoardPosition, 18);
-        console.log("test2");
         engine.onMessage(({
             positionEvaluation,
             possibleMate: newMate,
             pv,
             depth: newDepth
         }) => {
-            console.log("test3");
-            if (depth && depth < 10) return;
+            
+            console.log("Received evaluation:", positionEvaluation, "Possible mate:", newMate, "PV:", pv, "Depth:", newDepth);
+
             if (positionEvaluation) {
                 const numericEval = (engineGame.turn() === "w" ? 1 : -1) * Number(positionEvaluation) / 100;
                 setPositionEvaluation(numericEval);
@@ -151,12 +151,21 @@ function GameInfo() {
     }, [gameID]);
 
     useEffect(() => {
-        if (!engineGame.isGameOver() || engineGame.isDraw()) {
+        if ((!engineGame.isGameOver() || engineGame.isDraw()) && exists) {
             findBestMove();
+        } else {
+            setBestline("");
+            if (engineGame.isDraw()) {
+                setPositionEvaluation(0);
+            } else {
+                setPositionEvaluation(engineGame.turn() === "w" ? 10 : -10);
+            }
+            setPossibleMate("");
+            setDepth(0);
         }
     }, [chessBoardPosition, engineGame]);
     const bestMove = bestLine?.split(" ")?.[0];
-
+    
     return (
         <AuthorizeView>
             <NavBar></NavBar>
@@ -199,7 +208,7 @@ function GameInfo() {
                                 />
                             </div>
                             <div className="chessboard">
-                                <Chessboard position={game.fen} boardWidth="400" arePiecesDraggable={false} boardOrientation={boardOrientation} customArrows={bestMove ? [[(bestMove.substring(0, 2) as Square), (bestMove.substring(2, 4) as Square), "rgb(0, 128, 0)"]] : undefined} />
+                                <Chessboard position={game.fen} boardWidth="400" arePiecesDraggable={false} boardOrientation={boardOrientation} customArrows={(bestMove !== "")  ? [[(bestMove.substring(0, 2) as Square), (bestMove.substring(2, 4) as Square), "rgb(0, 128, 0)"]] : []} />
                             </div>   
                         </div>
                         <PlayerInfoCard

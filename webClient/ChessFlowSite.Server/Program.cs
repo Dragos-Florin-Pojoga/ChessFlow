@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Build.Experimental;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -109,8 +111,44 @@ namespace ChessFlowSite.Server
 
             var app = builder.Build();
 
+            Console.WriteLine($"ContentRootPath: {builder.Environment.ContentRootPath}");
+
+            // Add COOP and COEP headers globally
+            app.Use(async (context, next) =>
+            {
+                context.Response.Headers.Add("Cross-Origin-Embedder-Policy", "require-corp");
+                context.Response.Headers.Add("Cross-Origin-Opener-Policy", "same-origin");
+                await next();
+            });
+
             app.UseDefaultFiles();
             app.UseStaticFiles();
+
+            // Configure custom static file serving for engine files
+            app.UseStaticFiles(new StaticFileOptions
+            {
+                FileProvider = new PhysicalFileProvider(
+                    Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "../../engine/public"))),
+                // RequestPath = "/ChessFlowEngine",
+                RequestPath = "/public",
+                ContentTypeProvider = new FileExtensionContentTypeProvider
+                {
+                    Mappings =
+                    {
+                        [".js"] = "application/javascript",
+                        [".wasm"] = "application/wasm"
+                    }
+                },
+                OnPrepareResponse = ctx =>
+                {
+                    var headers = ctx.Context.Response.Headers;
+                    // headers.Add("Cross-Origin-Embedder-Policy", "require-corp");
+                    // headers.Add("Cross-Origin-Opener-Policy", "same-origin");
+                    headers.Add("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+                    headers.Add("Pragma", "no-cache");
+                    headers.Add("Expires", "0");
+                }
+            });
 
             using (var scope = app.Services.CreateScope())
             {
