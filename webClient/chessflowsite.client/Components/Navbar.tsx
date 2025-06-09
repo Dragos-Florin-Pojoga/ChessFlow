@@ -7,7 +7,7 @@ import OwnProfileLink from "../Components/OwnProfileLink.tsx";
 import { getToken } from "../Utils/authToken.ts";
 import '../src/App.css';
 
-function NavBar(props: { children: React.ReactNode }) {
+function NavBar() {
 
     const navigate = useNavigate();
 

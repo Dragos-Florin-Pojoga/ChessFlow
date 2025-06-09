@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Navigate } from "react-router-dom";
 import AuthorizeView from "../Components/AuthorizeView.js";
-import NavBar from "../Components/NavBar.js";
+import NavBar from "../Components/Navbar.tsx";
 import { getToken } from "../Utils/authToken.ts";
 import RequireRole from '../Components/RequireRole.js';
 import UnbanLink from '../Components/UnbanLink.tsx';

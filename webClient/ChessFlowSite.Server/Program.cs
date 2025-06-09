@@ -22,6 +22,10 @@ namespace ChessFlowSite.Server
             var builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
+            builder.Services.AddHttpsRedirection(options =>
+            {
+                options.HttpsPort = 7073;
+            });
 
             var connectionString = builder.Configuration.GetConnectionString("ApplicationDbContextConnection");
             builder.Services.AddDbContextFactory<ApplicationDbContext>(options => options.UseSqlite(connectionString));

@@ -1,5 +1,5 @@
 import AuthorizeView, { AuthorizedUser } from "../Components/AuthorizeView.tsx";
-import NavBar from "../Components/NavBar.tsx";
+import NavBar from "../Components/Navbar.tsx";
 import { useNavigate } from "react-router-dom";
 
 

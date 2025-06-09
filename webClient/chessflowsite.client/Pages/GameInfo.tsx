@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from "react-router-dom";
 import AuthorizeView from "../Components/AuthorizeView.js";
-import NavBar from "../Components/NavBar.js";
+import NavBar from "../Components/Navbar.tsx";
 import { getToken } from "../Utils/authToken.js";
-import UserStore from '../stores/UserStore.js';
+import UserStore from '../Stores/UserStore.js';
 import { Chessboard } from 'react-chessboard';
 import { Chess } from "chess.js";
 import PlayerInfoCard from '../Components/PlayerInfoCard.js'; 

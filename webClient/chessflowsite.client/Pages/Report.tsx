@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate, Navigate } from "react-router-dom";
 import AuthorizeView from "../Components/AuthorizeView.js";
-import NavBar from "../Components/NavBar.js";
+import NavBar from "../Components/Navbar.tsx";
 import { getToken } from "../Utils/authToken.ts";
-import UserStore from '../stores/UserStore.ts';
+import UserStore from '../Stores/UserStore.ts';
 
 function Report() {
     const param = useParams();
