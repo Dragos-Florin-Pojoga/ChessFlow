@@ -10,7 +10,14 @@ use tracing_subscriber::layer::SubscriberExt;
 #[global_allocator]
 static GLOBAL: tracy_client::ProfiledAllocator<std::alloc::System> = tracy_client::ProfiledAllocator::new(std::alloc::System, 100);
 
+#[cfg(feature = "dhat-heap")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
 fn main() {
+    #[cfg(feature = "dhat-heap")]
+    let _profiler = dhat::Profiler::new_heap();
+    
     #[cfg(feature = "tracy")]
     tracing::subscriber::set_global_default(
         tracing_subscriber::registry().with(tracing_tracy::TracyLayer::default())
@@ -19,7 +26,7 @@ fn main() {
     tracing::event!(tracing::Level::INFO, "STARTING PROFILING");
 
     let mut game = Game::new(Board::new_start_pos(), 7, 3);
-    let mut depth = 5;
+    let mut depth = 3;
 
     loop {
         #[cfg(feature = "tracy")]

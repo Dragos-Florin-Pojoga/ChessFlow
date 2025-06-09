@@ -34,6 +34,9 @@ run_web: build_web
 run_native_profiling:
 	./run_profiling_session.sh
 
+run_native_heap_profiling:
+	cargo run --bin native_engine --release --features dhat-heap
+
 clean:
 	cargo clean
 	rm './Cargo.lock'

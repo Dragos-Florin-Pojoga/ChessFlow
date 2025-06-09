@@ -162,7 +162,7 @@ export async function createEngineWorker() {
                     // Post the message to the worker, including the method name and arguments.
                     // Functions cannot be cloned, so `args` must only contain serializable data.
                     worker.postMessage({ callId, method: prop, args });
-                    console.log(`Main thread: Sent method call "${String(prop)}" with ID ${callId} to worker.`);
+                    console.log(`Main thread: Sent method call "${String(prop)}" with ID ${callId} to worker. (args: ${args})`);
                 } catch (e) {
                     // If postMessage itself fails (e.g., due to non-cloneable data),
                     // remove the listener and reject the promise immediately.
