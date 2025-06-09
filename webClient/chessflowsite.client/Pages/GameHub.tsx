@@ -1,7 +1,7 @@
 import React, { useState, useEffect, use } from "react";
 import { useNavigate } from "react-router-dom";
 import UserStore from '../Stores/UserStore.ts';
-import NavBar from "../Components/NavBar.tsx";
+import NavBar from "../Components/Navbar.tsx";
 import SignalRStore from '../Stores/SignalRStore.ts';
 import GameStore from '../Stores/GameStore.ts';
 import { isLoggedIn } from '../Utils/authToken.ts';

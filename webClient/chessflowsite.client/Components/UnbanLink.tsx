@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from "react-router-dom";
 import { getToken } from "../Utils/authToken.ts";
-import UserStore from '../stores/UserStore.ts';
+import UserStore from '../Stores/UserStore.ts';
 interface UnbanLinkProps {
     username: string;
     children: React.ReactNode;

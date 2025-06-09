@@ -8,7 +8,7 @@ import { getToken } from "../Utils/authToken.ts";
 import GameStore from '../Stores/GameStore.js';
 import '../src/App.css';
 
-function NavBar(props: { children: React.ReactNode }) {
+function NavBar() {
 
     const navigate = useNavigate();
 

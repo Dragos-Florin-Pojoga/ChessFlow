@@ -1,6 +1,6 @@
 import { useNavigate, Link } from "react-router-dom";
 import AuthorizeView from "../Components/AuthorizeView.tsx";
-import NavBar from "../Components/NavBar.tsx";
+import NavBar from "../Components/Navbar.tsx";
 import RequireRole from "../Components/RequireRole.tsx";
 
 function AdminPanel() {
