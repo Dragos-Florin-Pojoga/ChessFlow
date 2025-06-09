@@ -17,6 +17,7 @@ interface Game {
     timer: number;
     opponentTimer: number;
     fen: string;
+    isOver: boolean;
 }
 
 interface GameStore {

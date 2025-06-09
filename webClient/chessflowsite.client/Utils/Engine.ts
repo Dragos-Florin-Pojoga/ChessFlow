@@ -28,15 +28,22 @@ export default class Engine {
         this.stockfish = stockfish;
         this.isReady = false;
         this.onMessage = (callback) => {
+            /*
             this.stockfish.addEventListener("message", (e) => {
                 callback(this.transformSFMessageData(e));
             });
+            */
+            this.stockfish.onmessage = (e) => {
+                callback(this.transformSFMessageData(e)); 
+            };
         };
         this.init();
     }
 
     private transformSFMessageData(e) {
         const uciMessage = e?.data ?? e;
+
+        console.log("Uci message: ", uciMessage);
 
         return {
             uciMessage,

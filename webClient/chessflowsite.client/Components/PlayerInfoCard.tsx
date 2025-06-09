@@ -29,21 +29,22 @@ function PlayerInfoCard({key, name, elo, deltaElo = null, side, isGuest, gameID,
         navigate(`/report/${name}?gameID=${gameID}`);
     };
 
-    const formatTime = (seconds: number) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
+    const formatTime = (ms: number) => {
+        const totalSeconds = Math.floor((ms+499) / 1000); 
+        const mins = Math.floor(totalSeconds / 60);
+        const secs = totalSeconds % 60;
         return `${mins}:${secs.toString().padStart(2, "0")}`;
     }
-
+    /*
     useEffect(() => {
         setLocalTimer(timer); // Sync when timer prop changes
     }, [timer]);
-
+    */
     useEffect(() => {
         if (!isCountingDown) return;
 
         const interval = setInterval(() => {
-            setLocalTimer((prev) => Math.max(prev - 1, 0));
+            setLocalTimer((prev) => Math.max(prev - 1000, 0));
         }, 1000);
 
         return () => clearInterval(interval);

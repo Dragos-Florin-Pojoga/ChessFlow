@@ -140,6 +140,9 @@ function GameShow() {
     }
 
     const getChessboard = (game: GameData) => {
+        if (game.fen === null) {
+            return <div className="warning">Couldn't fetch board</div>
+        }
         return (<Chessboard
             position={game.fen}
             arePiecesDraggable={false}
