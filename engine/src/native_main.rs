@@ -1,7 +1,8 @@
 mod chess_lib;
 use chess_lib::*;
 
-
+use std::io;
+use std::io::{BufRead};
 
 #[cfg(feature = "tracy")]
 use tracing_subscriber::layer::SubscriberExt;
@@ -25,26 +26,14 @@ fn main() {
     #[cfg(feature = "tracy")]
     tracing::event!(tracing::Level::INFO, "STARTING PROFILING");
 
-    let mut game = Game::new(Board::new_start_pos(), 7, 3);
-    let mut depth = 3;
-
-    loop {
-        #[cfg(feature = "tracy")]
-        tracy_client::frame_mark();
-
-        if let Some(cpu) = game.find_best_move(depth) {
-            game.make_move(&cpu);
-        } else {
-            break;
+    let mut engine = Engine::new();
+    let stdin = io::stdin();
+    for line in stdin.lock().lines() {
+        let line = line.unwrap_or_default();
+        if let Ok(command) = parse_command(&line) {
+            engine.process_command(command);
         }
-        if game.get_game_state() != GameState::Ongoing {
-            break;
-        }
-
-        game.print();
     }
-
-    game.print_end();
 
     #[cfg(feature = "tracy")]
     tracing::event!(tracing::Level::INFO, "END PROFILING");

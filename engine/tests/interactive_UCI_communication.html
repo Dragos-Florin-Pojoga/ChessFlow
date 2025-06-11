@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WASM UCI Test</title>
+</head>
+<body>
+    <input type="text" id="userInput" placeholder="Enter some text">
+    <button id="submit">Process</button>
+
+    <pre id="output"></pre>
+
+    <script type="module">
+        import { createEngineWorker } from '/public/engine.js';
+
+        const engine = await createEngineWorker();
+        engine.start_wasm_engine();
+
+        function logToPage(message) {
+            const output = document.getElementById('output');
+            output.innerHTML += message;
+            output.innerHTML += "\n";
+        }
+
+        engine.register_callback(logToPage);
+
+        async function run() {
+            document.getElementById('submit').addEventListener('click', async () => {
+                const input = document.getElementById('userInput').value;
+                engine.send_uci_message(input);
+            });
+
+            const inputs = [
+                "uci",
+                "isready",
+                "go depth 1",
+                "uci",
+                "isready",
+                "setoption name max_depth value 10",
+            ];
+            for(const input of inputs) {
+                engine.send_uci_message(input);
+            }
+
+            setTimeout(() => {
+                engine.send_uci_message("go depth 9");
+            }, 1000);
+            setTimeout(() => {
+                engine.send_uci_message("stop");
+
+                setTimeout(() => {
+                    engine.send_uci_message("setoption name is_evaluation_mode value true");
+                    engine.send_uci_message("go depth 2");
+                }, 1000);
+            }, 3000);
+        }
+
+        run();
+
+    </script>
+</body>
+</html>

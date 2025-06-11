@@ -24,6 +24,7 @@ pub struct TTEntry {
 }
 
 /// The main chess engine struct containing search state and tables.
+#[derive(Debug, Clone)]
 pub struct Game {
     pub board: Board,
     pub move_history: Vec<ChessMove>,
@@ -35,10 +36,11 @@ pub struct Game {
     pub history_moves: [[i32; 64]; 64], // History table for non-capture moves (from_square_index, to_square_index) -> score
     pub max_search_depth: u8,
     pub q_search_max_ply: u8,
+    pub stop_signal: Arc<AtomicBool>,
 }
 
 impl Game {
-    pub fn new(board: Board, max_depth: u8, q_search_max_ply: u8) -> Self {
+    pub fn new(board: Board, max_depth: u8, q_search_max_ply: u8, stop_signal: Arc<AtomicBool>) -> Self {
         let mut pseudo_legal_moves_container = Vec::with_capacity(max_depth as usize + 1);
         let mut legal_moves_container = Vec::with_capacity(max_depth as usize + 1);
         let mut killer_moves = Vec::with_capacity(max_depth as usize + 1);
@@ -60,6 +62,7 @@ impl Game {
             killer_moves: killer_moves,
             history_moves: [[0; 64]; 64], // Initialize history table
             q_search_max_ply,
+            stop_signal
         }
     }
 
@@ -103,6 +106,8 @@ impl Game {
 
 
 use std::fmt::Write;
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 impl Game {
     pub fn to_pgn(&mut self) -> String {

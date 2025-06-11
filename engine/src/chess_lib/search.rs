@@ -2,7 +2,7 @@ use crate::board::*;
 use crate::terminal_states::*;
 use crate::game::*;
 use std::cmp::{max, min};
-
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 
 pub fn get_qsearch_piece_value(piece_type: PieceType) -> i32 {
     match piece_type {
@@ -19,6 +19,10 @@ impl Game {
     /// The Alpha-Beta search algorithm.
     #[cfg_attr(feature = "tracy", tracing::instrument(skip_all))]
     pub fn alphabeta(&mut self, board: Board, depth: u8, mut alpha: i32, mut beta: i32) -> i32 {
+        if self.stop_signal.load(Ordering::Relaxed) {
+            return 0; // Return a neutral score or a score indicating interruption
+        }
+        
         let original_alpha = alpha;
         let board_hash = board.compute_zobrist_hash();
 
@@ -131,6 +135,21 @@ impl Game {
         if board.turn == Color::White { // Maximizing player
             let mut value = i32::MIN; // Negative infinity
             for mv in &legal_moves {
+                if self.stop_signal.load(Ordering::Relaxed) {
+                    *self.board_repetition_counts.get_mut(&board_hash).unwrap() -= 1;
+                    self.pseudo_legal_moves_container[depth as usize] = pseudo_legal_moves;
+                    self.legal_moves_container[depth as usize] = legal_moves;
+                    // Store current best score before stopping
+                    let node_type = if value <= original_alpha { NodeType::Alpha }
+                                    else if value >= beta { NodeType::Beta }
+                                    else { NodeType::Exact };
+                    self.transposition_table.insert(
+                        board_hash,
+                        TTEntry { score: value, depth, node_type, best_move: best_move_for_tt },
+                    );
+                    return value;
+                }
+
                 let new_board = board.make_move(&mv);
                 let score = self.alphabeta(new_board, depth - 1, alpha, beta);
                 if score > value {
@@ -154,6 +173,21 @@ impl Game {
         } else { // Color::Black (Minimizing player)
             let mut value = i32::MAX; // Positive infinity
             for mv in &legal_moves {
+                if self.stop_signal.load(Ordering::Relaxed) {
+                    *self.board_repetition_counts.get_mut(&board_hash).unwrap() -= 1;
+                    self.pseudo_legal_moves_container[depth as usize] = pseudo_legal_moves;
+                    self.legal_moves_container[depth as usize] = legal_moves;
+                    // Store current best score before stopping
+                    let node_type = if value <= original_alpha { NodeType::Alpha }
+                                    else if value >= beta { NodeType::Beta }
+                                    else { NodeType::Exact };
+                    self.transposition_table.insert(
+                        board_hash,
+                        TTEntry { score: value, depth, node_type, best_move: best_move_for_tt },
+                    );
+                    return value;
+                }
+
                 let new_board = board.make_move(&mv);
                 let score = self.alphabeta(new_board, depth - 1, alpha, beta);
                 if score < value {
@@ -203,6 +237,10 @@ impl Game {
         mut beta: i32,
         q_depth: u8, // Remaining quiescence search depth
     ) -> i32 {
+        if self.stop_signal.load(Ordering::Relaxed) {
+            return 0; // Return a neutral score or a score indicating interruption
+        }
+
         // 1. Check quiescence depth limit
         if q_depth == 0 {
             // Depth limit reached, return static evaluation of the current position.
@@ -272,6 +310,10 @@ impl Game {
         if board.turn == Color::White { // Maximizing player
             let mut current_best_score = stand_pat_score; // Initialize with stand-pat
             for mv in &tactical_moves {
+                if self.stop_signal.load(Ordering::Relaxed) {
+                    return current_best_score; // Return the best score found so far
+                }
+
                 let new_board = board.make_move(&mv);
                 // Recursively call qsearch for the new board state
                 let score = self.qsearch(new_board, alpha, beta, q_depth - 1);
@@ -285,6 +327,10 @@ impl Game {
         } else { // Minimizing player (Black)
             let mut current_best_score = stand_pat_score; // Initialize with stand-pat
             for mv in &tactical_moves {
+                if self.stop_signal.load(Ordering::Relaxed) {
+                    return current_best_score; // Return the best score found so far
+                }
+
                 let new_board = board.make_move(&mv);
                 // Recursively call qsearch for the new board state
                 let score = self.qsearch(new_board, alpha, beta, q_depth - 1);
@@ -413,6 +459,10 @@ impl Game {
         if self.board.turn == Color::White { // Maximizing player
             let mut best_score = i32::MIN;
             for mv in legal_moves {
+                if self.stop_signal.load(Ordering::Relaxed) {
+                    return best; // Return the best move found so far if interrupted
+                }
+
                 let score = self.alphabeta(self.board.make_move(&mv), depth - 1, alpha, beta);
                 if score > best_score {
                     best_score = score;
@@ -423,6 +473,10 @@ impl Game {
         } else { // Color::Black (Minimizing player)
             let mut best_score = i32::MAX;
             for mv in legal_moves {
+                if self.stop_signal.load(Ordering::Relaxed) {
+                    return best; // Return the best move found so far if interrupted
+                }
+                
                 let score = self.alphabeta(self.board.make_move(&mv), depth - 1, alpha, beta);
                 if score < best_score {
                     best_score = score;

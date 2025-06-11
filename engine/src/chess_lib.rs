@@ -7,9 +7,6 @@
 pub mod uci_parser;
 pub use uci_parser::*;
 
-pub mod uci_executor;
-pub use uci_executor::*;
-
 pub mod bitboard;
 pub use bitboard::*;
 
@@ -33,3 +30,6 @@ pub use search::*;
 
 pub mod game;
 pub use game::*;
+
+pub mod engine;
+pub use engine::*;
