@@ -8,29 +8,46 @@ import { isLoggedIn } from '../Utils/authToken.js';
 import { connect } from "http2";
 import { Chessboard } from '../Vendors/react-chessboard/index.esm.js'; 
 import { Chess } from 'chess.js'
-import PlayerInfoCard from '../Components/PlayerInfoCard.tsx'; 
+import PlayerInfoCard from '../Components/PlayerInfoCard.tsx';
+import GamePopup from '../Components/GamePopup.tsx';
 
 import '../src/TailwindScoped.css';
+
+interface GamePopupProps {
+    result: "win" | "loss" | "draw" | "stalemate" | "timeout" | "opponentTimeout" | "resignation" | "opponentResignation";
+    whiteElo: number;
+    blackElo: number;
+    deltaWhiteElo: number | null,
+    deltaBlackElo: number | null,
+    whiteName: string;
+    blackName: string;
+}
 
 function ChessGame() {
     const param = useParams();
     const gameId = param.id;
 
-    const DEV_TEST: boolean = true; // Set to true for development testing so we can test the game page without a real game
+    const DEV_TEST: boolean = false; // Set to true for development testing so we can test the game page without a real game
 
     const [status, setStatus] = useState<string>("");
     const [errors, setErrors] = useState<string[]>([]);
 
     const { connection, startConnection, stopConnection } = SignalRStore();
     const { user, setUser, clearUser } = UserStore();
-    const { game, updateGame } = GameStore();
+    const { game, updateGame, clearGame } = GameStore();
     const isValidId: boolean = (game != null && 'id' in game && game.id === parseInt(gameId));
+
+    const hasRequestedBoard = useRef(false);
+    const [drawOffer, setDrawOffer] = useState<boolean>(false);
+    const [selfDraw, setSelfDraw] = useState<boolean>(false);
 
     const [selfTimer, setSelfTimer] = useState(game?.timer ?? 0);
     const [opponentTimer, setOpponentTimer] = useState(game?.opponentTimer ?? 0);
 
-    const [moveHistory, setMoveHistory] = useState<Move[]>([]);
+    const [moveHistory, setMoveHistory] = useState<string[]>([]);
     console.log(moveHistory);
+
+    const [result, setResult] = useState<GamePopupProps | null>(null);
 
     if (!isValidId && !DEV_TEST) {
         return (
@@ -96,6 +113,70 @@ function ChessGame() {
 
         return {key, name, elo, side, isGuest, isSelf, timer, isCountingDown };
     }
+
+    const setPopup = (originalResult, winner, deltaWhiteElo: number, deltaBlackElo: number) => {
+        const procWinner = winner !== null ? (winner === "white" ? "w" : "b") : null;
+        let result = "";
+        switch (originalResult) {
+            case "checkmate":
+                if (procWinner === game?.side) {
+                    result = "win";
+                }
+                else result = "loss";
+                break;
+            case "resignation":
+                if (procWinner !== game?.side) {
+                    result = "resignation";
+                }
+                else result = "opponentResignation";
+                break;
+            case "stalemate":
+                result = "stalemate";
+                break;
+            case "timeout":
+                if (procWinner !== game?.side) {
+                    result = "timeout";
+                }
+                else result = "opponentTimeout";
+                break;
+            case "agreedDraw":
+                result = "draw";
+                break;
+            default:
+                setError("Unknown game result");
+                return null;
+        }
+
+        const whiteElo = game.side === "w" ? game.elo : game.opponentElo;
+        const blackElo = game.side === "b" ? game.elo : game.opponentElo;
+        const whiteName = game.side === "w" ? game.name : game.opponentName;
+        const blackName = game.side === "b" ? game.name : game.opponentName;
+        return { result, whiteElo, blackElo, deltaWhiteElo, deltaBlackElo, whiteName, blackName };
+    }
+
+    const handleResign = async () => {
+        if (!connection) {
+            setError("Not connected to game hub.");
+            setStatus("");
+            return;
+        }
+
+        setErrors([]);
+        await connection.invoke("Resign");;
+    };
+
+    const handleDraw = async () => {
+        if (selfDraw) return;
+        if (!connection) {
+            setError("Not connected to game hub.");
+            setStatus("");
+            return;
+        }
+        setErrors([]);
+        setDrawOffer(true);
+        setSelfDraw(true);
+        await connection.invoke("OfferDraw");
+    }
     function safeGameMutate(modify) {
         setClientGame(g => {
             const update = {
@@ -130,7 +211,6 @@ function ChessGame() {
     }
 
     function clientValidateAndSetMove(square: Square) {
-        console.log("Here?");
         // check if valid move before showing dialog
         const moves = clientGame.moves({
             moveFrom,
@@ -177,7 +257,7 @@ function ChessGame() {
             return false;
         }
         connection?.invoke("MakeMove", game?.id ?? 1, move.san);
-        setMoveHistory([...moveHistory, move]);
+        setMoveHistory([...moveHistory, move.san]);
         setClientGame(gameCopy);
         setMoveFrom("");
         setMoveTo(null);
@@ -212,7 +292,7 @@ function ChessGame() {
                 promotion: piece[1].toLowerCase() ?? "q"
             });
             connection?.invoke("MakeMove", game?.id ?? 1, move.san);
-            setMoveHistory([...moveHistory, move]);
+            setMoveHistory([...moveHistory, move.san]);
             setClientGame(gameCopy);
         }
         setMoveFrom("");
@@ -246,6 +326,59 @@ function ChessGame() {
 
     useEffect(() => {
         if (!connection) return;
+
+        const handleGameEvent = (type: string, payload: any) => {
+            console.log(`Received game event: ${type}`, payload);
+            switch (type) {
+                case "MoveResult":
+                    {
+                        updateGame({
+                            activeSide: payload.turn == "white" ? "w" : "b",
+                            fen: payload.fen,
+                            timer: game?.side == "w" ? payload.whiteTime : payload.blackTime,
+                            opponentTimer: game?.side == "b" ? payload.whiteTime : payload.blackTime
+                        });
+                        const gameCopy = new Chess(payload.fen);
+                        setClientGame(gameCopy);
+                        if (!payload.valid) {
+                            setMoveHistory(prev => prev.slice(0, -1));
+                        }
+                        else if (payload.moveHistory != null && payload.lastMove != null) {
+                            setMoveHistory(payload.moveHistory.split(" "));
+                        }
+                        else if ((payload.turn == "white" ? "w" : "b") == game?.side && payload.lastMove != null) {
+                            setMoveHistory(prev => [...prev, payload.lastMove]);
+                        }
+                    }
+                    break;
+                case "GameOver":
+                    {
+                        const props = setPopup(payload.result, payload.winner, payload.deltaEloWhite, payload.deltaEloBlack);
+                        setResult(props);
+                        updateGame({
+                            isOver: true
+                        });
+
+                    }
+                    break;
+                case "UpdateDraw":
+                    {
+                        setDrawOffer(true);
+                    }
+            };
+        };
+
+        connection.on("GameEvent", handleGameEvent);
+
+        if (connection && !hasRequestedBoard.current && game) {
+            connection.invoke("RequestBoard")
+                .catch(err => console.error("Failed to request board:", err));
+            hasRequestedBoard.current = true;
+        }
+
+        return () => {
+            connection.off("GameEvent", handleGameEvent);
+        };
     }, [connection]);
 
     const setStatusUtil = (message: string) => {
@@ -288,6 +421,13 @@ function ChessGame() {
                     }
                 </>
                 <button className="flip-button-container" onClick={() => { setBoardOrientation(boardOrientation === "white" ? "black" : "white"); }}>Flip orientation</button>
+                <button className="flip-button-container" onClick={() => handleResign()}>Resign</button>
+                <>
+                    {
+                        (!selfDraw && game?.isBot != true)  && 
+                        <button className="flip-button-container" onClick={() => handleDraw()}>{drawOffer == true ? <div>Accept draw request</div> : <div>Request draw</div>}</button>
+                    }
+                </>
                 <div className="move-list-container p-4 max-w-md mx-auto">
                     <h3 className="font-semibold mb-2">Moves:</h3>
                     <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm bg-gray-50 rounded-md p-2 border">
@@ -307,13 +447,22 @@ function ChessGame() {
                                 return (
                                     <span key={i} className="flex space-x-1">
                                         <span className="font-medium">{turn}. </span>
-                                        <span>{fullMove[0]?.san} </span>
-                                        {fullMove[1] && <span>{fullMove[1].san} </span>}
+                                        <span>{fullMove[0]} </span>
+                                        {fullMove[1] && <span>{fullMove[1]} </span>}
                                     </span>
                                 )
                             })
                         }
                     </div>
+                </div>
+                <div>
+                    {result && (
+                        <div className="popup-overlay">
+                            <div className="popup">
+                                <GamePopup  {...result} />
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </>

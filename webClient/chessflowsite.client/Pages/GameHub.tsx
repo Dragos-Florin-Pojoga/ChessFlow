@@ -53,7 +53,7 @@ function GameHub() {
                 timer: gameData.timer,
                 opponentTimer: gameData.opponentTimer,
                 fen: gameData.fen,
-                moveHistory: [] 
+                isOver: false
             });
             console.log(game);
             // Navigate to the game page

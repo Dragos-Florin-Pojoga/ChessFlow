@@ -77,6 +77,30 @@ namespace ChessFlowSite.Server.Hubs
             await _gameManager.ProcessMoveAsync(gameId, Context.ConnectionId, move);
         }
 
+        public async Task Resign() {
+            await _gameManager.HandleDisconnectAsync(Context.ConnectionId);
+        }
+
+        public async Task OfferDraw() {
+            await _gameManager.OfferDrawAsync(Context.ConnectionId);
+        }
+
+        public async Task RequestBoard() {
+            await _gameManager.RequestBoardAsync(Context.ConnectionId);
+        }
+
+        public static Task RemoveConnection(string connectionId)
+        {
+            lock (JoinedConnections)
+            {
+                if (JoinedConnections.Contains(connectionId))
+                {
+                    JoinedConnections.Remove(connectionId);
+                }
+            }
+            return Task.CompletedTask;
+        }
+
         public override async Task OnDisconnectedAsync(Exception exception)
         {
             var connectionId = Context.ConnectionId;

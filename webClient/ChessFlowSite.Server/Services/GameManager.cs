@@ -1,8 +1,10 @@
-﻿using ChessFlowSite.Server.Models;
+﻿using ChessFlowSite.Server.Hubs;
+using ChessFlowSite.Server.Models;
 using ChessFlowSite.Server.Sessions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using ReactApp1.Server.Data;
+using System.Drawing;
 
 namespace ChessFlowSite.Server.Services
 {
@@ -84,7 +86,7 @@ namespace ChessFlowSite.Server.Services
             .FirstOrDefaultAsync(g => g.Id == game.Id);
 
 
-            var session = new GameSession(game.Id, player, null, clients);
+            var session = new GameSession(game.Id, player, null, clients, this);
             lock (_lock)
             {
                 _activeGames[game.Id] = session;
@@ -111,15 +113,23 @@ namespace ChessFlowSite.Server.Services
                 {
                     _activeGames.Remove(session.GameId);
 
-                    var opponentId = session.GetOpponentId(connectionId);
-                    if (opponentId != null)
-                    {
-                        session.Clients.Client(opponentId).SendAsync("OpponentDisconnected");
-                    }
+                    session.handleResign(connectionId);
                 }
 
                 // Remove from queue
                 _waitingPlayers.RemoveAll(p => p.ConnectionId == connectionId);
+            }
+        }
+
+        public async Task OfferDrawAsync(string connectionId)
+        {
+            lock (_lock)
+            {
+                var session = _activeGames.Values.FirstOrDefault(g => g.ContainsPlayer(connectionId));
+                if (session != null)
+                {
+                    session.OfferDraw(connectionId);
+                }
             }
         }
 
@@ -157,7 +167,7 @@ namespace ChessFlowSite.Server.Services
             .Include(g => g.PlayerBlack)
             .FirstOrDefaultAsync(g => g.Id == game.Id);
 
-            var session = new GameSession(game.Id, p1, p2, clients);
+            var session = new GameSession(game.Id, p1, p2, clients, this);
             lock (_lock)
             {
                 _activeGames[game.Id] = session;
@@ -165,6 +175,89 @@ namespace ChessFlowSite.Server.Services
 
             await clients.Client(p1.ConnectionId).SendAsync("GameStarted", game.Id, new GameDataModel(game, "w", p1.Elo, p2.Elo));
             await clients.Client(p2.ConnectionId).SendAsync("GameStarted", game.Id, new GameDataModel(game, "b", p2.Elo, p1.Elo));
+        }
+
+        public async Task EndGame(int GameId, Player playerWhite, Player? playerBlack, int deltaEloWhite, int deltaEloBlack, string? winner, string result, int moveCount, string finalFen, string PGN) {
+            lock (_lock) {
+                if (_waitingPlayers.Any(p => p.ConnectionId == playerWhite.ConnectionId))
+                {
+                    _waitingPlayers.Remove(playerWhite);
+                }
+                if (playerBlack != null && _waitingPlayers.Any(p => p.ConnectionId == playerBlack.ConnectionId))
+                {
+                    _waitingPlayers.Remove(playerBlack);
+                }
+                GameHub.RemoveConnection(playerWhite.ConnectionId);
+                if (playerBlack != null)
+                {
+                    GameHub.RemoveConnection(playerBlack.ConnectionId);
+                }
+            }
+            // update database
+
+            await using var db = _dbFactory.CreateDbContext();
+            var game = await db.Games
+                .Include(g => g.PlayerWhite)
+                .Include(g => g.PlayerBlack)
+                .FirstOrDefaultAsync(g => g.Id == GameId);
+            if (game != null) {
+                game.DeltaEloWhite = deltaEloWhite;
+                game.DeltaEloBlack = deltaEloBlack;
+                string realResult = "";
+                if (winner != null) {
+                    realResult = winner == "white" ? "White" : "Black";
+                }
+                else if (result == "agreedDraw")
+                {
+                    realResult = "Draw";
+                }
+                else if(result == "stalemate")
+                {
+                    realResult = "Stalemate"; 
+                }
+                else
+                {
+                    throw new ArgumentException("Invalid result type");
+                }
+
+                game.Result = realResult;
+                game.EndTime = DateTime.UtcNow;
+
+                game.FinalFEN = finalFen;
+                game.PGN = PGN;
+                game.MoveCount = moveCount;
+
+                await updateELoPlayer(playerWhite, deltaEloWhite);
+                await updateELoPlayer(playerBlack, deltaEloBlack);
+
+                await db.SaveChangesAsync();
+            }
+
+        }
+
+        public async Task RequestBoardAsync(string connectionId)
+        {
+            lock (_lock)
+            {
+                var session = _activeGames.Values.FirstOrDefault(g => g.ContainsPlayer(connectionId));
+                if (session != null)
+                {
+                    session.SendBoardToClient(connectionId);
+                }
+            }
+        }
+
+        private async Task updateELoPlayer(Player player, int deltaELo) {
+            if(player != null && !player.isGuest)
+            {
+                await using var db = _dbFactory.CreateDbContext();
+                var user = await db.ApplicationUsers.FirstOrDefaultAsync(u => u.Id == player.UserId);
+                if (user != null)
+                {
+                    user.Elo = player.Elo + deltaELo;
+                    await db.SaveChangesAsync();
+                }
+            }
         }
     }
 
@@ -195,9 +288,9 @@ namespace ChessFlowSite.Server.Services
             IsOpponentGuest = side == "w" ? game.GuestBlackName != null : game.GuestWhiteName != null;
             IsBotGame = game.IsBotGame;
             Format = game.Format ?? "Classical"; // Default to Classical if not set
-            Timer = Format == "Bullet" ? 300 :
-                    Format == "Blitz" ? 600 :
-                    Format == "Classical" ? 3600 : 0; // Default timer values for different formats
+            Timer = Format == "Bullet" ? 300000 :
+                    Format == "Blitz" ? 600000 :
+                    Format == "Classical" ? 3600000 : 0; // Default timer values for different formats
             OpponentTimer = Timer; // Assuming both players start with the same timer
             Fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"; // Initial FEN for a new game, temporary hardcoded string for now
         }

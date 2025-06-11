@@ -4,9 +4,11 @@ import UserStore from '../Stores/UserStore.ts';
 import SignalRStore from "../Stores/SignalRStore.ts";
 import { getToken, setToken } from "../Utils/authToken.ts";
 import Banned from '../Components/Banned.tsx';
+import GameStore from '../Stores/GameStore.js';
 function Login() {
     const { setUser } = UserStore();
     const { startConnection, stopConnection } = SignalRStore();
+    const { clearGame } = GameStore();
 
 
     // state variables for email and passwords
@@ -95,6 +97,7 @@ function Login() {
                             await startConnection();
 
                             navigate("/");
+                            setTimeout(() => clearGame(), 100);
                         }
                     }
                     else if (response.status === 401) {

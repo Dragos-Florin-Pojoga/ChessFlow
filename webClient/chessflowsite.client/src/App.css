@@ -21,6 +21,7 @@ th, td {
 .topnav {
     background-color: #333;
     overflow: hidden;
+    z-index: 99999;
 }
 
     /* Style the links inside the navigation bar */
@@ -51,6 +52,7 @@ html {
     margin: 0;
     background-color: #222;
     color: #fff;
+    overflow: hidden;
 }
 
 html,
@@ -219,5 +221,37 @@ body,
     display: flex;
     gap: 5px;
     width: fit-content;
+}
+
+.popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+    pointer-events: all;
+}
+
+.popup {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #aaaaaa;
+    border: 2px solid #000;
+    border-radius: 8px;
+    width: 400px;
+    z-index: 9999;
+    text-align: center;
+    overflow: hidden;
+}
+
+.popup2 {
+    background-color: #555555;
 }
 
