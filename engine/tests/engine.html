@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WASM Engine test</title>
+</head>
+<body>
+    <script type="module">
+        import { createEngineWorker } from '/public/engine.js';
+        const engine = await createEngineWorker();
+        
+        engine.register_callback((message) => {
+            console.log("Callback from Rust:", message);
+        });
+        
+        engine.trigger_callback_from_rust("FOO");
+
+        engine.debug();
+        engine.debug();
+
+        engine.trigger_callback_from_rust("BAR");
+    </script>
+</body>
+</html>

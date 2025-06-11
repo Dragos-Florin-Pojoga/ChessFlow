@@ -9,8 +9,7 @@
     <script type="module">
         import { createEngineWorker } from '/public/engine.js';
 
-        const engine = createEngineWorker();
-        await new Promise(r => setTimeout(r, 400));
+        const engine = await createEngineWorker();
 
         await engine.multithreading_test_stage_one();
 

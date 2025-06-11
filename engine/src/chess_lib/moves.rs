@@ -4,18 +4,15 @@ impl Board {
     /// Generates all pseudo-legal moves for the current player.
     /// Pseudo-legal moves are moves that are valid for the piece type,
     /// but do not check if the king is left in check.
-    pub fn generate_pseudo_legal_moves(&self) -> Vec<ChessMove> {
-        let mut moves = Vec::with_capacity(64); // Pre-allocate, rough estimate
+    pub fn generate_pseudo_legal_moves(&self, moves: &mut Vec<ChessMove>) {
         let player_color = self.turn;
         
-        self.generate_pawn_moves(&mut moves, player_color);
-        self.generate_leaper_moves(&mut moves, player_color, PieceType::Knight);
-        self.generate_king_moves(&mut moves, player_color); // Includes castling
-        self.generate_sliding_moves(&mut moves, player_color, PieceType::Bishop);
-        self.generate_sliding_moves(&mut moves, player_color, PieceType::Rook);
-        self.generate_sliding_moves(&mut moves, player_color, PieceType::Queen);
-        
-        moves
+        self.generate_pawn_moves(moves, player_color);
+        self.generate_leaper_moves(moves, player_color, PieceType::Knight);
+        self.generate_king_moves(moves, player_color); // Includes castling
+        self.generate_sliding_moves(moves, player_color, PieceType::Bishop);
+        self.generate_sliding_moves(moves, player_color, PieceType::Rook);
+        self.generate_sliding_moves(moves, player_color, PieceType::Queen);
     }
 
     fn generate_pawn_moves(&self, moves: &mut Vec<ChessMove>, color: Color) {
@@ -55,12 +52,12 @@ impl Board {
             let pawn_attacks_bb = PRECOMPUTED.pawn_attacks[color as usize][from_sq.to_u8() as usize];
             let possible_captures = pawn_attacks_bb & opponent_bb;
             for to_sq in possible_captures.iter() {
-                 if to_sq.rank() == promotion_rank {
+                if to_sq.rank() == promotion_rank {
                     for &promo_piece in PieceType::PROMOTION_PIECES.iter() {
-                        moves.push(ChessMove::new(from_sq, to_sq, Some(promo_piece)));
+                        moves.push(ChessMove::new_capture(from_sq, to_sq, Some(promo_piece)));
                     }
                 } else {
-                    moves.push(ChessMove::new(from_sq, to_sq, None));
+                    moves.push(ChessMove::new_capture(from_sq, to_sq, None));
                 }
             }
             
@@ -68,7 +65,7 @@ impl Board {
             if let Some(ep_sq) = self.en_passant_square {
                 if from_sq.rank() == ep_rank { // Pawn must be on the correct rank for EP
                     if (pawn_attacks_bb & Bitboard::from_square(ep_sq)).is_not_empty() {
-                        moves.push(ChessMove::new(from_sq, ep_sq, None)); // NOTE: EP is a special capture but is not flagged in the move
+                        moves.push(ChessMove::new_capture(from_sq, ep_sq, None)); // NOTE: EP is a special capture but is not flagged in the move
                     }
                 }
             }
@@ -87,7 +84,10 @@ impl Board {
         for from_sq in pieces_bb.iter() {
             let attacks = attack_lut[from_sq.to_u8() as usize] & !friendly_bb; // Cannot move to friendly occupied square
             for to_sq in attacks.iter() {
-                moves.push(ChessMove::new(from_sq, to_sq, None));
+                let is_capture = self.occupied_bb.is_set(to_sq); // guaranteed to be opponent because of the above condition
+                let mut mv = ChessMove::new(from_sq, to_sq, None);
+                mv.set_capture(is_capture);
+                moves.push(mv);
             }
         }
     }
@@ -100,7 +100,10 @@ impl Board {
         let friendly_bb = self.color_bbs[color as usize];
         let king_normal_moves = PRECOMPUTED.king_attacks[from_sq.to_u8() as usize] & !friendly_bb;
         for to_sq in king_normal_moves.iter() {
-            moves.push(ChessMove::new(from_sq, to_sq, None));
+            let is_capture = self.occupied_bb.is_set(to_sq); // guaranteed to be opponent because of the above condition
+            let mut mv = ChessMove::new(from_sq, to_sq, None);
+            mv.set_capture(is_capture);
+            moves.push(mv);
         }
 
         // Castling
@@ -139,6 +142,7 @@ impl Board {
         let friendly_bb = self.color_bbs[color as usize];
         
         for from_sq in pieces_bb.iter() {
+            // TODO: potential improvement if match outside for loop?
             let attacks = match piece_type {
                 PieceType::Bishop => self.get_bishop_attacks(from_sq, self.occupied_bb),
                 PieceType::Rook => self.get_rook_attacks(from_sq, self.occupied_bb),
@@ -149,7 +153,10 @@ impl Board {
             
             let valid_moves = attacks & !friendly_bb; // Cannot move to friendly occupied square
             for to_sq in valid_moves.iter() {
-                moves.push(ChessMove::new(from_sq, to_sq, None));
+                let is_capture = self.occupied_bb.is_set(to_sq); // guaranteed to be opponent because of the above condition
+                let mut mv = ChessMove::new(from_sq, to_sq, None);
+                mv.set_capture(is_capture);
+                moves.push(mv);
             }
         }
     }
@@ -221,6 +228,45 @@ impl Board {
         
         false
     }
+
+
+    pub fn get_attacked_squares(&self, attacker_color: Color) -> Bitboard {
+        let mut attacked_squares = Bitboard::new();
+        let opponent_pieces = self.color_bbs[attacker_color as usize];
+
+        // Pawn attacks
+        let pawns = self.piece_bbs[PieceType::Pawn as usize] & opponent_pieces;
+        for sq in pawns.iter() {
+            attacked_squares |= PRECOMPUTED.pawn_attacks[attacker_color as usize][sq.to_u8() as usize];
+        }
+
+        // Knight attacks
+        let knights = self.piece_bbs[PieceType::Knight as usize] & opponent_pieces;
+        for sq in knights.iter() {
+            attacked_squares |= PRECOMPUTED.knight_attacks[sq.to_u8() as usize];
+        }
+
+        // King attacks
+        let king = self.piece_bbs[PieceType::King as usize] & opponent_pieces;
+        // Assuming there's only one king of a given color on the board for simplicity
+        if let Some(king_sq) = king.iter().next() {
+            attacked_squares |= PRECOMPUTED.king_attacks[king_sq.to_u8() as usize];
+        }
+
+        // Rook and Queen attacks (rook-like)
+        let rook_like_attackers = (self.piece_bbs[PieceType::Rook as usize] | self.piece_bbs[PieceType::Queen as usize]) & opponent_pieces;
+        for sq in rook_like_attackers.iter() {
+            attacked_squares |= self.get_rook_attacks(sq, self.occupied_bb);
+        }
+
+        // Bishop and Queen attacks (bishop-like)
+        let bishop_like_attackers = (self.piece_bbs[PieceType::Bishop as usize] | self.piece_bbs[PieceType::Queen as usize]) & opponent_pieces;
+        for sq in bishop_like_attackers.iter() {
+            attacked_squares |= self.get_bishop_attacks(sq, self.occupied_bb);
+        }
+
+        attacked_squares
+    }
 }
 
 
@@ -231,13 +277,13 @@ impl Board {
 
 impl Board {
     /// Makes a move on the board and returns a new board state.
-    pub fn make_move(&self, mv: &ChessMove) -> Board {
+    pub fn make_move(&self, mv: &ChessMove) -> Board { // TODO: make the move inplace and add option to undo
         let mut new_board = self.clone();
         let moving_piece_color = self.turn;
         let opponent_color = moving_piece_color.opponent();
 
         // 1. Identify the piece being moved on the original board
-        let (moving_piece_type, _) = self.piece_on_square(mv.from)
+        let (moving_piece_type, _) = self.piece_on_square(mv.from())
             .expect("There should be a piece on the 'from' square");
 
         // Reset en passant square for the next turn unless it's a pawn double push
@@ -258,7 +304,7 @@ impl Board {
         // 2. Handle Captures (including En Passant)
         let captured_piece_sq = if let Some(ep_sq) = self.en_passant_square {
             // Check for En Passant Capture: Is it a pawn moving to the EP square?
-            if moving_piece_type == PieceType::Pawn && mv.to == ep_sq {
+            if moving_piece_type == PieceType::Pawn && mv.to() == ep_sq {
                 // The captured pawn is on the rank of the EP square, same file as the EP square
                 let captured_pawn_sq = match moving_piece_color {
                     Color::White => ep_sq.try_offset(0, -1).unwrap(), // Captured black pawn is one rank below EP square
@@ -274,15 +320,15 @@ impl Board {
                 Some(captured_pawn_sq) // Indicate a piece was captured (for occupied_bb update)
             } else {
                 // Not an en passant move, check for standard capture at destination
-                if self.occupied_bb.is_set(mv.to) {
-                    if let Some((captured_pt, captured_color)) = self.piece_on_square(mv.to) {
-                         // Standard capture
-                         new_board.piece_bbs[captured_pt as usize].clear(mv.to);
-                         new_board.color_bbs[captured_color as usize].clear(mv.to);
-                         new_board.halfmove_clock = 0; // Capture resets halfmove clock
-                         Some(mv.to) // Indicate a piece was captured
+                if self.occupied_bb.is_set(mv.to()) {
+                    if let Some((captured_pt, captured_color)) = self.piece_on_square(mv.to()) {
+                        // Standard capture
+                        new_board.piece_bbs[captured_pt as usize].clear(mv.to());
+                        new_board.color_bbs[captured_color as usize].clear(mv.to());
+                        new_board.halfmove_clock = 0; // Capture resets halfmove clock
+                        Some(mv.to()) // Indicate a piece was captured
                     } else {
-                         None // Should not happen if occupied_bb is correct
+                        None // Should not happen if occupied_bb is correct
                     }
                 } else {
                     None // No capture
@@ -290,15 +336,15 @@ impl Board {
             }
         } else {
             // No en passant square was set, check for standard capture at destination
-             if self.occupied_bb.is_set(mv.to) {
-                if let Some((captured_pt, captured_color)) = self.piece_on_square(mv.to) {
-                     // Standard capture
-                     new_board.piece_bbs[captured_pt as usize].clear(mv.to);
-                     new_board.color_bbs[captured_color as usize].clear(mv.to);
-                     new_board.halfmove_clock = 0; // Capture resets halfmove clock
-                     Some(mv.to) // Indicate a piece was captured
+             if self.occupied_bb.is_set(mv.to()) {
+                if let Some((captured_pt, captured_color)) = self.piece_on_square(mv.to()) {
+                    // Standard capture
+                    new_board.piece_bbs[captured_pt as usize].clear(mv.to());
+                    new_board.color_bbs[captured_color as usize].clear(mv.to());
+                    new_board.halfmove_clock = 0; // Capture resets halfmove clock
+                    Some(mv.to()) // Indicate a piece was captured
                 } else {
-                     None // Should not happen if occupied_bb is correct
+                    None // Should not happen if occupied_bb is correct
                 }
             } else {
                 None // No capture
@@ -307,26 +353,26 @@ impl Board {
         
         // 3. Move the piece
         // Remove from 'from' square
-        new_board.piece_bbs[moving_piece_type as usize].clear(mv.from);
-        new_board.color_bbs[moving_piece_color as usize].clear(mv.from);
+        new_board.piece_bbs[moving_piece_type as usize].clear(mv.from());
+        new_board.color_bbs[moving_piece_color as usize].clear(mv.from());
         // Add to 'to' square
-        new_board.piece_bbs[moving_piece_type as usize].set(mv.to);
-        new_board.color_bbs[moving_piece_color as usize].set(mv.to);
+        new_board.piece_bbs[moving_piece_type as usize].set(mv.to());
+        new_board.color_bbs[moving_piece_color as usize].set(mv.to());
 
         // 4. Handle Special Moves (Promotion, Castling)
 
         // Promotion
-        if let Some(promoted_piece_type) = mv.promotion {
+        if let Some(promoted_piece_type) = mv.promotion() {
             // Remove the pawn that arrived at the promotion square
-            new_board.piece_bbs[PieceType::Pawn as usize].clear(mv.to);
+            new_board.piece_bbs[PieceType::Pawn as usize].clear(mv.to());
             // Add the promoted piece
-            new_board.piece_bbs[promoted_piece_type as usize].set(mv.to);
+            new_board.piece_bbs[promoted_piece_type as usize].set(mv.to());
         }
 
         // Castling (handled by checking King move of 2 squares horizontally)
-        if moving_piece_type == PieceType::King && (mv.to.file() as i8 - mv.from.file() as i8).abs() == 2 {
+        if moving_piece_type == PieceType::King && (mv.to().file() as i8 - mv.from().file() as i8).abs() == 2 {
             // This is a castling move, move the corresponding rook
-            match (moving_piece_color, mv.to) {
+            match (moving_piece_color, mv.to()) {
                 (Color::White, Square::G1) => { // White Kingside Castle
                     let rook_from = Square::H1;
                     let rook_to = Square::F1;
@@ -379,7 +425,7 @@ impl Board {
         }
         // Moving a rook from its starting square removes that side's castling right
         if moving_piece_type == PieceType::Rook {
-            match mv.from {
+            match mv.from() {
                 Square::A1 => new_board.castling_rights.remove_right(CastlingRights::WHITE_QUEENSIDE),
                 Square::H1 => new_board.castling_rights.remove_right(CastlingRights::WHITE_KINGSIDE),
                 Square::A8 => new_board.castling_rights.remove_right(CastlingRights::BLACK_QUEENSIDE),
@@ -404,13 +450,13 @@ impl Board {
 
 
         // 6. Set En Passant Square for the next turn if it was a pawn double push
-        if moving_piece_type == PieceType::Pawn && (mv.from.rank() as i8 - mv.to.rank() as i8).abs() == 2 {
+        if moving_piece_type == PieceType::Pawn && (mv.from().rank() as i8 - mv.to().rank() as i8).abs() == 2 {
             let ep_rank = match moving_piece_color {
                 Color::White => 2, // White pawn moved from rank 1 to 3, EP target is rank 2
                 Color::Black => 5, // Black pawn moved from rank 6 to 4, EP target is rank 5
             };
             // The EP target square is on the file of the destination square, at the EP rank
-            new_board.en_passant_square = Some(Square::from_file_rank(mv.to.file(), ep_rank));
+            new_board.en_passant_square = Some(Square::from_file_rank(mv.to().file(), ep_rank));
         }
 
 
@@ -424,20 +470,23 @@ impl Board {
     }
 
     /// Generates all fully legal moves for the current player.
-    pub fn generate_legal_moves(&self) -> Vec<ChessMove> {
-        let pseudo_legal_moves = self.generate_pseudo_legal_moves();
-        let mut legal_moves = Vec::with_capacity(pseudo_legal_moves.len());
+    #[cfg_attr(feature = "tracy", tracing::instrument(skip_all))]
+    pub fn generate_legal_moves(&self, pseudo_legal_moves: &mut Vec<ChessMove>, legal_moves: &mut Vec<ChessMove>) {
+        pseudo_legal_moves.clear();
+        legal_moves.clear();
+
+        self.generate_pseudo_legal_moves(pseudo_legal_moves);
         let current_player_color = self.turn;
 
         for mv in pseudo_legal_moves.iter() {
             // Special handling for castling: check squares king passes through
             // This is a bit tricky as pseudo-legal castling only checks empty squares, not attacks.
-            let is_castle_move = self.piece_bbs[PieceType::King as usize].is_set(mv.from) &&
-                                 (mv.to.file() as i8 - mv.from.file() as i8).abs() == 2;
+            let is_castle_move = self.piece_bbs[PieceType::King as usize].is_set(mv.from()) &&
+                                 (mv.to().file() as i8 - mv.from().file() as i8).abs() == 2;
 
             if is_castle_move {
-                let king_start_sq = mv.from;
-                let king_mid_sq = if mv.to.file() > king_start_sq.file() { // Kingside
+                let king_start_sq = mv.from();
+                let king_mid_sq = if mv.to().file() > king_start_sq.file() { // Kingside
                     king_start_sq.try_offset(1,0).unwrap()
                 } else { // Queenside
                     king_start_sq.try_offset(-1,0).unwrap()
@@ -468,7 +517,6 @@ impl Board {
                 legal_moves.push(*mv);
             }
         }
-        legal_moves
     }
 }
 

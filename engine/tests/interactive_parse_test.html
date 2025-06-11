@@ -13,7 +13,7 @@
     <script type="module">
         import { createEngineWorker } from '/public/engine.js';
 
-        const engine = createEngineWorker();
+        const engine = await createEngineWorker();
 
         function logToPage(message) {
             const output = document.getElementById('output');
@@ -49,9 +49,6 @@
                     console.error("Error from engine:", err);
                 }
             });
-
-
-            await new Promise(r => setTimeout(r, 400));
 
             const inputs = [
                 "go",

@@ -1,6 +1,4 @@
-use crate::bitboard::*;
 use crate::board::*;
-use crate::moves::*;
 
 
 #[derive(Debug, PartialEq, Eq)]
@@ -10,13 +8,16 @@ pub enum GameState {
     Stalemate,
     FiftyMoveDraw,
     InsufficientMaterialDraw,
-    // ThreefoldRepetitionDraw, // TODO: Requires external history tracking
+    ThreefoldRepetitionDraw, // TODO: technically, this ALLOWS the player to claim a draw... FivefoldRepetitionDraw would be the one always enforced...
 }
 
 impl Board {
 
-    pub fn check_game_state(&self) -> GameState {
-        // Check for Fifty-move rule draw
+    pub fn check_game_state(&self, has_no_legal_moves: bool, board_repetition_count: u8) -> GameState {
+        if board_repetition_count >= 3 {
+            return GameState::ThreefoldRepetitionDraw;
+        }
+        
         if self.halfmove_clock >= 100 { // 100 half-moves = 50 full moves
             return GameState::FiftyMoveDraw;
         }
@@ -25,15 +26,13 @@ impl Board {
             return GameState::InsufficientMaterialDraw;
         }
 
-        let legal_moves = self.generate_legal_moves();
-
         // If there are no legal moves, it's either checkmate or stalemate
-        if legal_moves.is_empty() {
+        if has_no_legal_moves {
             let king_square = self.find_king_square(self.turn);
             if let Some(king_sq) = king_square {
                 if self.is_square_attacked(king_sq, self.turn.opponent()) {
                     // King is attacked and no legal moves
-                    return GameState::Checkmate(self.turn); // TODO: is this right?
+                    return GameState::Checkmate(self.turn);
                 } else {
                     // King is not attacked and no legal moves
                     return GameState::Stalemate;
@@ -47,7 +46,7 @@ impl Board {
         GameState::Ongoing
     }
 
-    fn find_king_square(&self, color: Color) -> Option<Square> {
+    pub fn find_king_square(&self, color: Color) -> Option<Square> {
         let king_bb = self.piece_bbs[PieceType::King as usize] & self.color_bbs[color as usize];
         king_bb.iter().next()
     }
@@ -113,15 +112,50 @@ impl Board {
         // depending on the specific engine's rules. This simplified check
         // treats K+NN vs K as insufficient.
 
-        // King and Bishops on the same colored squares vs King (if only bishops remain)
-        // This is more complex to check purely with bitboards and would require
-        // analyzing the squares the bishops are on. A simplified check could assume
-        // that if only kings and bishops remain, and bishops are present for one side,
-        // it's sufficient unless all bishops are on the same color. This simplified check
-        // doesn't delve into bishop square colors and might be slightly inaccurate
-        // for the edge case of bishops on the same color.
-
-        // TODO: add checkerboard bitboard to check for this case
+        // Check for K + same-colored Bishops vs K
+        if white_pawns.is_empty() && black_pawns.is_empty() &&
+            white_rooks.is_empty() && black_rooks.is_empty() &&
+            white_queens.is_empty() && black_queens.is_empty() &&
+            white_knights.is_empty() && black_knights.is_empty() 
+            { // Only Kings and Bishops remain
+                if white_bishops.popcount() > 0 {
+                    let mut first_bishop_square_color: Option<bool> = None; // true for light, false for dark
+                    let mut all_same_color = true;
+                    for sq in white_bishops.iter() {
+                        let sq_is_light = sq.is_light();
+                        if let Some(first_color) = first_bishop_square_color {
+                            if first_color != sq_is_light {
+                                all_same_color = false;
+                                break;
+                            }
+                        } else {
+                            first_bishop_square_color = Some(sq_is_light);
+                        }
+                    }
+                    if all_same_color {
+                        return true; // White has only K and bishops on same-colored squares
+                    }
+                }
+                if black_bishops.popcount() > 0 {
+                    // similar logic for black bishops
+                    let mut first_bishop_square_color: Option<bool> = None;
+                    let mut all_same_color = true;
+                    for sq in black_bishops.iter() {
+                        let sq_is_light = sq.is_light();
+                        if let Some(first_color) = first_bishop_square_color {
+                            if first_color != sq_is_light {
+                                all_same_color = false;
+                                break;
+                            }
+                        } else {
+                            first_bishop_square_color = Some(sq_is_light);
+                        }
+                    }
+                    if all_same_color {
+                        return true; // Black has only K and bishops on same-colored squares
+                    }
+                }
+        }
 
         false // Assume sufficient material otherwise
     }

@@ -1,5 +1,9 @@
 // from https://www.chessprogramming.org/Simplified_Evaluation_Function
 
+// Disable warning because it is actually used but the compiler isn't smart enough
+// see: evaluate.rs for usage
+// #![allow(dead_code)]
+
 pub const PAWN_PST: [i32; 64] = [
      0,  0,  0,  0,  0,  0,  0,  0,
     50, 50, 50, 50, 50, 50, 50, 50,

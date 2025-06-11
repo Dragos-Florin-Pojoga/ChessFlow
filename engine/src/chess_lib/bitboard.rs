@@ -24,24 +24,29 @@ pub enum Square {
 // "a file rank 1"
 
 impl Square {
+    #[inline]
     pub fn from_u8(val: u8) -> Self {
         unsafe { std::mem::transmute(val) }
     }
 
+    #[inline]
     pub fn from_file_rank(file: u8, rank: u8) -> Self {
         Self::from_u8(rank * 8 + file)
     }
 
+    #[inline]
     pub fn to_u8(self) -> u8 {
         self as u8
     }
 
     /// Gets the file (column) of the square (0-7, where 0 is 'a'-file).
+    #[inline]
     pub fn file(self) -> u8 {
         self.to_u8() % 8
     }
 
     /// Gets the rank (row) of the square (0-7, where 0 is 1st rank).
+    #[inline]
     pub fn rank(self) -> u8 {
         self.to_u8() / 8
     }
@@ -82,6 +87,29 @@ impl Square {
         };
         Some(Square::from_file_rank(file, rank))
     }
+
+    pub fn to_algebraic(&self) -> String {
+        let file_char = (b'a' + self.file()) as char;
+        let rank_char = (b'1' + self.rank()) as char;
+        format!("{}{}", file_char, rank_char)
+    }
+
+    pub fn is_light(&self) -> bool {
+        // (self.file() + self.rank()) % 2 != 0
+        ((self.to_u8() >> 3) & 1) ^ (self.to_u8() & 1) == 1
+    }
+
+    pub fn surrounding_squares(self) -> impl Iterator<Item = Square> {
+        [
+            (-1, -1), (0, -1), (1, -1), // Rank below
+            (-1,  0),          (1,  0), // Same rank
+            (-1,  1), (0,  1), (1,  1), // Rank above
+        ]
+        .into_iter()
+        .filter_map(move |(file_offset, rank_offset)| {
+            self.try_offset(file_offset, rank_offset)
+        })
+    }
 }
 
 /// Represents an 8x8 bitboard using a u64.
@@ -94,10 +122,12 @@ impl Bitboard {
     /// A bitboard with all bits set (full board).
     pub const FULL: Self = Bitboard(u64::MAX);
 
+    #[inline]
     pub fn new() -> Self {
         Bitboard::EMPTY
     }
 
+    #[inline]
     pub fn from_u64(value: u64) -> Self {
         Bitboard(value)
     }
@@ -107,6 +137,7 @@ impl Bitboard {
         Bitboard(1u64 << square.to_u8())
     }
     
+    #[inline]
     pub fn as_u64(self) -> u64 {
         self.0
     }
@@ -180,6 +211,7 @@ impl Bitboard {
     }
 
 
+    #[inline]
     pub fn iter(self) -> BitboardIterator {
         BitboardIterator { bitboard: self }
     }
@@ -280,6 +312,7 @@ pub struct BitboardIterator {
 impl Iterator for BitboardIterator {
     type Item = Square;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.bitboard.is_empty() {
             None

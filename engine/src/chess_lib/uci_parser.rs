@@ -8,7 +8,7 @@ pub enum UciCommand {
     IsReady,
     NewGame,
     Position { fen: Option<Fen>, moves: Vec<String> }, // if fen is None, then command is 'position startpos ...'
-    Go,
+    Go { depth: Option<u8> }, // more can be added
     Stop,
     Quit,
 }
@@ -176,7 +176,22 @@ pub fn parse_command(line: &str) -> Result<UciCommand, UciParseError> {
     let command = parts.next().map(|s| s.to_ascii_lowercase());
 
     match command.as_deref() {
-        Some("go")          => Ok(UciCommand::Go),
+        Some("go")          => {
+            if let Some(token) = parts.next() {
+                match token {
+                    "depth" => {
+                        if let Some(depth) = parts.next() {
+                            let depth = depth.parse().unwrap_or(0);
+                            if depth != 0 {
+                                return Ok(UciCommand::Go{ depth: Some(depth) });
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            return Ok(UciCommand::Go{ depth: None });
+        },
 
         Some("position")    => {
             let mut fen: Option<Fen> = None;

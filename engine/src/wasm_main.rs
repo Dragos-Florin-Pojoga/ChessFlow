@@ -3,11 +3,7 @@ use chess_lib::*;
 
 use wasm_bindgen::prelude::*;
 use web_sys::console;
-use std::{
-    cell::OnceCell,
-    sync::{atomic::AtomicUsize, Arc, Mutex},
-};
-use js_sys::Function;
+use std::sync::{atomic::AtomicUsize, Arc, Mutex};
 use wasm_bindgen_spawn::ThreadCreator;
 
 use std::sync::{atomic::Ordering};
@@ -31,11 +27,6 @@ extern "C" {
 
 
 
-
-thread_local! {
-    static THREAD_CREATOR: OnceCell<Arc<ThreadCreator>> = OnceCell::new();
-}
-
 #[wasm_bindgen(start)]
 pub fn start() {
     console_error_panic_hook::set_once();
@@ -58,10 +49,6 @@ pub fn start() {
     console::log_1(&"WASM start completed".into());
 }
 
-fn thread_creator() -> Arc<ThreadCreator> {
-    THREAD_CREATOR.with(|cell| Arc::clone(cell.get().unwrap()))
-}
-
 
 // USE FOR TESTING ONLY
 // THIS WILL PANICK
@@ -70,14 +57,11 @@ pub fn process_string(line: &str) -> String {
     format!("{:?}", parse_command(line).unwrap())
 }
 
-// USE FOR TESTING ONLY
+
 #[wasm_bindgen]
-pub fn parse_and_execute_line(line: &str) -> String {
-    execute_command(parse_command(line).unwrap())
+pub fn debug() {
+    console::error_1(&"DEBUG".into());
 }
-
-
-
 
 
 
@@ -126,5 +110,67 @@ pub fn multithreading_test_stage_two() {
             Ok(value) => log_str(&format!("Worker thread returned: {}", value)),
             Err(e) => log_str(&format!("Worker thread failed: {:?}", e)),
         }
+    }
+}
+
+
+
+use wasm_bindgen::JsValue;
+use futures::{channel::{mpsc, oneshot}, SinkExt, StreamExt};
+use std::panic;
+use std::panic::AssertUnwindSafe; 
+
+
+#[wasm_bindgen]
+pub fn trigger_callback_from_rust(msg: &str) {
+    let global = js_sys::global()
+                    .dyn_into::<web_sys::DedicatedWorkerGlobalScope>()
+                    .expect("Failed to get DedicatedWorkerGlobalScope");
+    let message_obj = js_sys::Object::new();
+    js_sys::Reflect::set(&message_obj, &JsValue::from_str("type"), &JsValue::from_str("callback_trigger")).unwrap();
+    js_sys::Reflect::set(&message_obj, &JsValue::from_str("message"), &JsValue::from_str(msg)).unwrap();
+    global.post_message(&message_obj).expect("Failed to post message from worker");
+}
+
+use std::sync::OnceLock;
+
+static MUTEXED_ENGINE: OnceLock<std::sync::Mutex<Engine>> = OnceLock::new();
+
+#[wasm_bindgen]
+pub fn start_wasm_engine() {
+    MUTEXED_ENGINE.get_or_init(|| {
+        log!("Initializing Mutex<Engine> for the first time.");
+        std::sync::Mutex::new(Engine::new())
+    });
+    
+    let (result_tx, mut result_rx) = futures::channel::mpsc::channel::<String>(100);
+
+    GLOBAL_RESPONSE_SENDER.set(result_tx.clone())
+        .map_err(|_| "GLOBAL_RESPONSE_SENDER already set!")
+        .expect("Failed to set global response sender. It should only be set once.");
+    wasm_bindgen_futures::spawn_local(async move {
+        let global_scope = js_sys::global()
+            .dyn_into::<web_sys::DedicatedWorkerGlobalScope>()
+            .expect("Failed to get DedicatedWorkerGlobalScope for posting messages. This listener should be on the main thread.");
+        while let Some(message) = result_rx.next().await {
+            web_sys::console::warn_1(&message.clone().into());
+
+            let message_obj = js_sys::Object::new();
+            js_sys::Reflect::set(&message_obj, &JsValue::from_str("type"), &JsValue::from_str("callback_trigger")).unwrap();
+            js_sys::Reflect::set(&message_obj, &JsValue::from_str("message"), &JsValue::from_str(&message)).unwrap();
+
+            global_scope.post_message(&message_obj).expect("Failed to post message from worker to JS.");
+        }
+    });
+}
+
+#[wasm_bindgen]
+pub fn send_uci_message(msg: &str) {
+    let engine_mutex = MUTEXED_ENGINE.get().unwrap();
+    let mut engine_guard = engine_mutex.lock().unwrap();
+    if let Ok(command) = parse_command(msg) {
+        engine_guard.process_command(command);
+    } else {
+        log!("PARSE FAIL: {}", msg);
     }
 }
