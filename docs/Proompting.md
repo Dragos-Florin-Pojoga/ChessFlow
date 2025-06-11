@@ -6,6 +6,23 @@
 
 ---
 
+### AIs used[^ranking]:
+[^ranking]: ranked based on my experience with them during this project. The results are heavily biased because of the mostly Rust codebase and very specific requirements
+
+* [Gemini 2.5 Pro](https://gemini.google.com)
+* [Gemini 2.5 Flash](https://gemini.google.com)
+* [DeepSeek R1](https://chat.deepseek.com)
+* [ChatGPT 4o](https://chatgpt.com)
+* [Cursor AI](https://www.cursor.com)
+    * with [Claude Sonnet 3.5](https://claude.ai)
+* [DeepSeek V3](https://chat.deepseek.com)
+* [ChatGPT o4-mini](https://chatgpt.com)
+* [Github Copilot](https://github.com/features/copilot)
+    * trough [Vscode agent mode](https://code.visualstudio.com) with [Claude Sonnet 3.5](https://claude.ai)
+* [Microsoft Copilot](https://copilot.microsoft.com)
+
+---
+
 ### The "ChessFlow" name was actually AI-generated.
 
 It’s surprisingly difficult to come up with a name for a chess-related app that sounds good and isn’t already in use. We brainstormed ideas for quite some time before settling on this one. To generate ideas, we used ChatGPT and DeepSeek with very simple prompts.
