@@ -26,7 +26,9 @@ export default class Engine {
 
     constructor() {
         this.chess_engine_interface = ChessFlowEngine;
-        this.chess_engine_interface.start_engine_thread();
+        this.chess_engine_interface.start_wasm_engine();
+        this.chess_engine_interface.send_uci_message(`setoption name is_evaluation_mode value true`);
+        this.chess_engine_interface.send_uci_message(`setoption name max_depth value 14`);
         this.isReady = false;
         this.onMessage = (callback) => {
             this.chess_engine_interface.register_callback((e) => {
@@ -68,9 +70,7 @@ export default class Engine {
         });
     }
 
-    evaluatePosition(fen, depth = 12) {
-        if (depth > 24) depth = 24;
-
+    evaluatePositionUntilDepth(fen, depth) {
         this.chess_engine_interface.send_uci_message(`position fen ${fen}`);
         this.chess_engine_interface.send_uci_message(`go depth ${depth}`);
     }
