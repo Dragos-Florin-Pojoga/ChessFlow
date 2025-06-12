@@ -3,12 +3,13 @@ mod game_logic;
 
 use api::{IncomingMessage, OutgoingMessage, GameOverReason, PlayerColor};
 use game_logic::{Board, GameTimer, PieceType, Player};
+// std::env nu mai este necesar pentru pipe, dar îl lăsăm în caz că va fi folosit în viitor
 use std::env;
 use std::time::Duration;
 use std::str::FromStr;
 
+// Am eliminat use-urile specifice pentru Named Pipes
 use tokio::io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::net::windows::named_pipe::{ServerOptions, NamedPipeServer};
 use tokio::time::sleep;
 use shakmaty::{Position, san::San};
 
@@ -26,21 +27,13 @@ struct GameSession {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let simple_pipe_name = env::args().nth(1).ok_or_else(|| anyhow::anyhow!("Pipe name not provided."))?;
-    let full_pipe_path = format!(r"\\.\pipe\{}", simple_pipe_name);
-    println!("GM Process: Creating server on pipe '{}'.", full_pipe_path);
-    let server = ServerOptions::new().first_pipe_instance(true).create(&full_pipe_path)?;
-    println!("GM Process: Waiting for client to connect...");
-    server.connect().await?;
-    println!("GM Process: Client connected.");
-    handle_client(server).await?;
-    println!("GM Process shutting down.");
-    Ok(())
-}
+    // Mesajele de log sunt trimise la stderr
+    eprintln!("GM Process: Started. Listening on stdin for commands.");
 
-async fn handle_client(server: NamedPipeServer) -> anyhow::Result<()> {
-    let (read_half, mut write_half) = io::split(server);
-    let mut reader = BufReader::new(read_half);
+    // Logica a fost mutată din `handle_client` direct în `main`
+    // și adaptată pentru stdin/stdout.
+    let mut reader = BufReader::new(io::stdin());
+    let mut writer = io::stdout();
     let mut line = String::new();
     let mut session: Option<GameSession> = None;
 
@@ -49,40 +42,51 @@ async fn handle_client(server: NamedPipeServer) -> anyhow::Result<()> {
             if let Some(time_left) = s.timer.time_left_on_current_turn(s.turn) {
                 sleep(time_left)
             } else {
+                // Dacă nu există timp, așteptăm pe termen nedefinit citirea
                 sleep(Duration::from_secs(u64::MAX))
             }
         } else {
+            // Dacă nu a început jocul, așteptăm pe termen nedefinit citirea
             sleep(Duration::from_secs(u64::MAX))
         };
 
         tokio::select! {
+            // Citim o linie de la stdin
             result = reader.read_line(&mut line) => {
                 match result {
-                    Ok(0) => { println!("Client disconnected."); break; }
+                    Ok(0) => {
+                        eprintln!("GM Process: stdin closed. Shutting down.");
+                        break; // EOF, procesul părinte probabil s-a închis
+                    }
                     Ok(_) => {
-                        println!("[SERVER] Received: {}", line.trim());
+                        eprintln!("[GM-LOG] Received: {}", line.trim());
 
                         let response = handle_incoming_message(&mut session, &line);
 
                         if let Some(resp) = response {
                             let json = serde_json::to_string(&resp)? + "\n";
-                            println!("[SERVER] Sending: {}", json.trim());
-                            write_half.write_all(json.as_bytes()).await?;
-                            write_half.flush().await?;
+                            eprintln!("[GM-LOG] Sending: {}", json.trim());
+
+                            // Scriem răspunsul la stdout
+                            writer.write_all(json.as_bytes()).await?;
+                            writer.flush().await?;
 
                             if let OutgoingMessage::GameOver {..} = resp {
-                                break;
+                                break; // Ieșim din buclă la finalul jocului
                             }
                         }
                         line.clear();
                     }
-                    Err(e) => { eprintln!("Pipe read error: {}", e); break; }
+                    Err(e) => {
+                        eprintln!("GM Process: stdin read error: {}", e);
+                        break;
+                    }
                 }
             }
-
+            // Logica de timeout rămâne neschimbată
             _ = sleep_future => {
                 if let Some(s) = session.as_mut() {
-                    println!("[SERVER] Timeout detected for player {:?}!", s.turn);
+                    eprintln!("[GM-LOG] Timeout detected for player {:?}!", s.turn);
                     let winner = s.turn.opponent();
                     let game_result = if winner == Player::White { (1.0, 0.0) } else { (0.0, 1.0) };
                     let (white_elo_change, black_elo_change) = get_elo_changes_for_result(s, game_result);
@@ -98,17 +102,24 @@ async fn handle_client(server: NamedPipeServer) -> anyhow::Result<()> {
                     };
 
                     let json = serde_json::to_string(&response)? + "\n";
-                    println!("[SERVER] Sending: {}", json.trim());
-                    write_half.write_all(json.as_bytes()).await?;
-                    write_half.flush().await?;
+                    eprintln!("[GM-LOG] Sending: {}", json.trim());
+                    writer.write_all(json.as_bytes()).await?;
+                    writer.flush().await?;
 
-                    break;
+                    break; // Ieșim din buclă la finalul jocului
                 }
             }
         }
     }
+
+    eprintln!("GM Process shutting down.");
     Ok(())
 }
+
+// Functia handle_client a fost eliminata, continutul ei fiind integrat in main.
+
+// TOATE CELELALTE FUNCTII (handle_incoming_message, get_fen, etc.) RAMAN NESCHIMBATE
+// Le copiez aici pentru a avea un fisier complet.
 
 fn handle_incoming_message(session: &mut Option<GameSession>, line: &str) -> Option<OutgoingMessage> {
     match serde_json::from_str::<IncomingMessage>(line) {
