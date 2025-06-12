@@ -66,7 +66,7 @@ namespace ChessFlowSite.Server.Sessions
                 while (!errReader.EndOfStream)
                 {
                     var line = await errReader.ReadLineAsync();
-                    Console.Error.WriteLine($"[Rust Error] {line}");
+                    Console.Error.WriteLine($"{line}");
                 }
             });
 
