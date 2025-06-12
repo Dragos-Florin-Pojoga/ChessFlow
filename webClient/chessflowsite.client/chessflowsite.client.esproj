@@ -10,4 +10,7 @@
     <TypeScriptExperimentalDecorators>True</TypeScriptExperimentalDecorators>
     <TypeScriptEmitDecoratorMetadata>True</TypeScriptEmitDecoratorMetadata>
   </PropertyGroup>
+  <ItemGroup>
+    <Folder Include="Vendors\react-chessboard\" />
+  </ItemGroup>
 </Project>

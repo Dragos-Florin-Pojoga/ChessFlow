@@ -44,26 +44,33 @@ export default defineConfig({
     plugins: [plugin()],
     resolve: {
         alias: {
-            '@': fileURLToPath(new URL('./src', import.meta.url))
+            '@': fileURLToPath(new URL('./src', import.meta.url)),
+            '/public': path.resolve(__dirname, '../../engine/public'),
         }
     },
     server: {
         proxy: {
-            '^/weatherforecast': {
-                target,
-                secure: false
-            },
             '/api': {
                 target,
                 secure: false,
+                ws: true,
                 changeOrigin: true
-            }
+            },
+            '/public': {
+                target,
+                secure: false,
+                ws: true,
+                changeOrigin: true
+            },
         },
-            port: parseInt(env.DEV_SERVER_PORT || '60252'),
-            https: {
-                key: fs.readFileSync(keyFilePath),
-                cert: fs.readFileSync(certFilePath),
-            }
+        port: parseInt(env.DEV_SERVER_PORT || '60252'),
+        https: {
+            key: fs.readFileSync(keyFilePath),
+            cert: fs.readFileSync(certFilePath),
+        },
+        headers: {
+            'Cross-Origin-Embedder-Policy': 'require-corp',
+            'Cross-Origin-Opener-Policy': 'same-origin'
         }
-    
+    }
 })

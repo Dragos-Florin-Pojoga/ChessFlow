@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from "react-router-dom";
 import AuthorizeView from "../Components/AuthorizeView.js";
-import NavBar from "../Components/NavBar.js";
+import NavBar from "../Components/Navbar.tsx";
 import { getToken } from "../Utils/authToken.ts";
-import UserStore from '../stores/UserStore.ts';
+import UserStore from '../Stores/UserStore.ts';
+import GameCarousel from '../Components/GameCarousel.tsx';
+import GameShow from './GameShow.tsx';
 
 function UserInfo() {
     const param = useParams();
@@ -16,12 +18,9 @@ function UserInfo() {
 
     const { user, setUser } = UserStore();
 
-    console.log(param);
     const username = param.username;
 
     const token = getToken();
-
-    console.log(token);
 
     const handleReportClick = () => {
         navigate(`/report/${username}`);
@@ -37,10 +36,8 @@ function UserInfo() {
             }
         })
             .then(async (response) => {
-                console.log(response);
                 if (response.ok) {
                     let data = await response.json();
-                    console.log(data);
                     setName1(data.name);
                     setElo(data.elo);
                     setExists(true);
@@ -68,6 +65,9 @@ function UserInfo() {
                                 <button type="button" onClick={handleReportClick}>Report!</button>
                         }
                     </div>
+                    <h2>Recent games: </h2>
+                    <GameCarousel username={name1} />
+                    <div><a href="#" onClick={() => navigate(`/games/?usernameOne=${name1}`)}>See games as list</a></div>
                 </>
                 :
                 <h1>User doesn't exist!</h1>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
-import UserStore from '../stores/UserStore.ts';
+import UserStore from '../Stores/UserStore.ts';
 import { getToken, clearToken } from "../Utils/authToken.ts";
 
 interface User {

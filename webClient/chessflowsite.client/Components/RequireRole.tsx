@@ -6,10 +6,11 @@ import {decodeToken } from "../Utils/authToken.ts";
 interface RequireRoleProps {
     roles: string[]; // Array of allowed roles
     children: React.ReactNode;
+    fallback?: React.ReactNode; 
     link?: boolean;
 }
 
-function RequireRole({ roles, children, link = false }: RequireRoleProps) {
+function RequireRole({ roles, children, fallback = null, link = false }: RequireRoleProps) {
     const payload = decodeToken();
 
     const userRoles = payload?.role;
@@ -24,7 +25,7 @@ function RequireRole({ roles, children, link = false }: RequireRoleProps) {
 
     if (!hasAccess) {
         if (link) {
-            return <></>;
+            return <>{fallback}</>;
         }
         else return <Navigate to="/unauthorized" />;
     }

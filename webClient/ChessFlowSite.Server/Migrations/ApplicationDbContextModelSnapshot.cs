@@ -146,6 +146,12 @@ namespace ChessFlowSite.Server.Migrations
                     b.Property<string>("BotId")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("DeltaEloBlack")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("DeltaEloWhite")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int?>("EloBlack")
                         .HasColumnType("INTEGER");
 

@@ -21,6 +21,7 @@ th, td {
 .topnav {
     background-color: #333;
     overflow: hidden;
+    z-index: 99999;
 }
 
     /* Style the links inside the navigation bar */
@@ -51,6 +52,7 @@ html {
     margin: 0;
     background-color: #222;
     color: #fff;
+    overflow: hidden;
 }
 
 html,
@@ -76,5 +78,180 @@ body,
 
 .message {
     color: #00ffff;
+}
+
+.unstyled {
+    color: inherit;
+    text-decoration: inherit;
+    cursor: inherit;
+}
+
+.reset {
+    width: initial;
+    height: initial;
+    padding: initial;
+    margin: initial;
+    max-width: initial;
+    text-align: initial;
+}
+
+.flip-button-container {
+    display: flex;
+    justify-content: center;
+    margin-top: 1rem;
+}
+.flip-button-container2 {
+    justify-content: center;
+    margin-top: 1rem;
+}
+
+
+.white-circle {
+    width: 20px;
+    height: 20px;
+    background-color: white;
+    border-radius: 50%;
+    border: 2px solid black;
+    display: inline-block;
+}
+.black-circle {
+    width: 20px;
+    height: 20px;
+    background-color: black;
+    border-radius: 50%;
+    border: 2px solid white;
+    display: inline-block;
+}
+
+.player-info-card {
+    display: block;
+    width: 400px;
+    justify-content: center;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    border: dashed 1px #fff;
+}
+
+.player-info-card.active {
+    background-color: rgba(120,120,0,0.5);
+}
+
+.bolded-move {
+    font-weight: bold;
+    background-color: rgba(255, 255,255, 0.2);
+}
+
+.plus-elo {
+    color: #00ff00;
+    font-weight: bold;
+}
+
+.minus-elo {
+    color: #ff0000;
+    font-weight: bold;
+}
+
+.eval-bar {
+    height: 400px;
+    width: 50px;
+}
+
+    .eval-bar .eval-value {
+        width: 100%;
+        background-color: #ffffff;
+        transition: height 0.3s ease-in-out
+    }
+
+    .eval-bar .eval-mis {
+        width: 100%;
+        background-color: #000000;
+        transition: height 0.3s ease-in-out
+    }
+
+.eval-container {
+    display: flex;
+    justify-content: center;
+}
+
+    .eval-container * {
+        flex-grow: 0;
+        flex-shrink: 0;
+    }
+
+.chessboard {
+    width: min-content;
+}
+.chessboard2 {
+    width: min-content;
+    justify-content: center;
+    display: inline-block
+}
+
+.centered-player-info-card {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.game-card-container {
+    width: 300px;
+    border: 2px solid #000000;
+    border-radius: 8px;
+    background-color: rgba(255,255,255, 0.1);
+}
+
+    .game-card-container:hover {
+        background-color: rgba(255,255,255, 0.2);
+    }
+
+    .game-card-container:active {
+        background-color: rgba(255,255,255, 0.3);
+    }
+
+.carousel-div {
+    overflow: hidden;
+    width: fit-content;
+    margin: 0 auto;
+    border: 2px double #000000;
+    border-radius: 8px;
+    background-color: #333;
+    padding: 10px;
+}
+
+.game-carousel-container {
+    display: flex;
+    gap: 5px;
+    width: fit-content;
+}
+
+.popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 999;
+    pointer-events: all;
+}
+
+.popup {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #aaaaaa;
+    border: 2px solid #000;
+    border-radius: 8px;
+    width: 400px;
+    z-index: 9999;
+    text-align: center;
+    overflow: hidden;
+}
+
+.popup2 {
+    background-color: #555555;
 }
 

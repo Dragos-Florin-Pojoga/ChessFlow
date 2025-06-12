@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {useNavigate, Navigate } from "react-router-dom";
 import AuthorizeView from "../Components/AuthorizeView.js";
-import NavBar from "../Components/NavBar.js";
+import NavBar from "../Components/Navbar.tsx";
 import { getToken } from "../Utils/authToken.ts";
-import UserStore from '../stores/UserStore.ts';
+import UserStore from '../Stores/UserStore.ts';
 import RequireRole from '../Components/RequireRole.js';
+import UnbanLink from '../Components/UnbanLink.tsx';
 
 import '../src/TailwindScoped.css';
 
@@ -83,6 +84,14 @@ function ReportShow() {
         setIsAscending(tempIsAscending);
     };
 
+    const handleUnbanned = (name: string) => {
+        setReports((reports) =>
+            reports.map((report) =>
+                report.reportedName === name ? { ...report, reportedBanned: false } : report
+            )
+        );
+    };
+
     return (
         <AuthorizeView>
             <RequireRole roles={["Admin"]}>
@@ -130,6 +139,7 @@ function ReportShow() {
                                     <th className="border px-2 py-1">Reason</th>
                                     <th className="border px-2 py-1">Date created</th>
                                     <th className="border px-2 py-1"></th>
+                                    <th className="border px-2 py-1"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -145,15 +155,25 @@ function ReportShow() {
                                             <td className="border px-2 py-1">{r.reportID}</td>
                                             <td className="border px-2 py-1">{r.reportedName}</td>
                                             <td className="border px-2 py-1">{r.reporteeName}</td>
-                                            <td className="border px-2 py-1">{r.gameID ?? 'N/A'}</td>
+                                            <td className="border px-2 py-1">{r.gameID != null ? (<a href="#" onClick={() => navigate(`/game/${r.gameID}`)}>{r.gameID}</a>) : 'N/A'}</td>
                                             <td className="border px-2 py-1">{r.reason}</td>
                                             <td className="border px-2 py-1">{r.created}</td>
                                             <td className="border px-2 py-1">
                                                 {
-                                                    r.reportedBanned ?
-                                                        <div className="warning">User is already banned!</div>
+                                                    r.reportedBanned ? <></>
                                                         :
-                                                        <span><a href="#" onClick={() => navigate(`/ban/${r.reportedName}?reportID=${r.reportID}`)}>Create ban</a></span>
+                                                        <a href="#" onClick={() => navigate(`/games/?usernameOne=${r.reportedName}`)}>See all games</a>
+                                                }
+                                            </td>
+                                            <td className="border px-2 py-1">
+                                                {
+                                                    r.reportedBanned ?
+                                                        <>
+                                                            <span className={"warning"}>User is banned! </span>
+                                                            <RequireRole roles={["Admin"]} link={true}><UnbanLink onUnbanned={() => handleUnbanned(r.reportedName)} username={r.reportedName}>Unban user</UnbanLink></RequireRole>
+                                                        </>
+                                                        :
+                                                        <RequireRole roles={["Admin"]} link={true}><span><a href="#" onClick={() => navigate(`/ban/${r.reportedName}?reportID=${r.reportID}`)}>Create ban</a></span></RequireRole>
                                                 }
                                             </td>
                                         </tr>

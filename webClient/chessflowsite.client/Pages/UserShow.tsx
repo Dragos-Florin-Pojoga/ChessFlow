@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Navigate } from "react-router-dom";
 import AuthorizeView from "../Components/AuthorizeView.js";
-import NavBar from "../Components/NavBar.js";
+import NavBar from "../Components/Navbar.tsx";
 import { getToken } from "../Utils/authToken.ts";
 import RequireRole from '../Components/RequireRole.js';
+import UnbanLink from '../Components/UnbanLink.tsx';
 
 import '../src/TailwindScoped.css';
 
@@ -76,6 +77,14 @@ function UserShow() {
         setIsAscending(tempIsAscending);
     };
 
+    const handleUnbanned = (name: string) => {
+        setUsers((users) =>
+            users.map((user) =>
+                user.name === name ? { ...user, banned: false } : user
+            )
+        );
+    };
+
     return (
         <AuthorizeView>
             <NavBar></NavBar>
@@ -123,14 +132,16 @@ function UserShow() {
                             ) : (
                                 users.map((r) => (
                                     <tr key={r.name}>
-                                        <td className="border px-2 py-1">{r.isAdmin ? <span className="message">[ADMIN]</span> : <></>}{r.name}</td>
+                                        <td className="border px-2 py-1">{r.isAdmin ? <span className="message">[ADMIN]</span> : <></>}<a className={"unstyled"} href="#" onClick={() => navigate(`/user/${r.name}`)}>{r.name}</a></td>
                                         <td className="border px-2 py-1">{r.elo}</td>
                                         <td className="border px-2 py-1">{r.games}</td>
-                                        <td className="border px-2 py-1">{r.gameID ?? 'N/A'}</td>
                                         <td className="border px-2 py-1">
                                             {
                                                 r.banned ?
-                                                    <div className="warning">User is already banned!</div>
+                                                    <>
+                                                        <span className={"warning"}>User is banned! </span>
+                                                        <RequireRole roles={["Admin"]} link={true}><UnbanLink onUnbanned={() => handleUnbanned(r.name)} username={r.name}>Unban user</UnbanLink></RequireRole>
+                                                    </>
                                                     :
                                                     <RequireRole roles={["Admin"]} link={true}><span><a href="#" onClick={() => navigate(`/ban/${r.name}`)}>Create ban</a></span></RequireRole>
                                             }
