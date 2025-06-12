@@ -43,13 +43,12 @@ namespace ChessFlowSite.Server.Sessions
             BotId = botId;
 
             string path = "../../GM/target/release/GM";
-            string pipeName = $"chessflow-{gameId}";
             _process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = path,
-                    Arguments = pipeName,
+                    Arguments = gameId.ToString(),
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardError = true,
