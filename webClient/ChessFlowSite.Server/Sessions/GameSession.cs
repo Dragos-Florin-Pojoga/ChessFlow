@@ -2,9 +2,6 @@
 using ChessFlowSite.Server.Services;
 using Microsoft.AspNetCore.SignalR;
 using System.Diagnostics;
-using System.IO.Pipelines;
-using System.IO.Pipes;
-using System.Security.Cryptography.Xml;
 using System.Text.Json;
 
 namespace ChessFlowSite.Server.Sessions
@@ -12,7 +9,6 @@ namespace ChessFlowSite.Server.Sessions
     public class GameSession
     {
         private readonly Process _process;
-        private readonly NamedPipeClientStream _pipeClient;
         private readonly StreamWriter _writer;
         private readonly StreamReader _reader;
 
@@ -47,16 +43,17 @@ namespace ChessFlowSite.Server.Sessions
             BotId = botId;
 
             string path = "../../GM/target/release/GM";
-            string pipeName = $"chessflow-{gameId}";
             _process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = path,
-                    Arguments = pipeName,
+                    Arguments = gameId.ToString(),
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardError = true,
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
                     WindowStyle = ProcessWindowStyle.Hidden
                 }
             };
@@ -69,15 +66,12 @@ namespace ChessFlowSite.Server.Sessions
                 while (!errReader.EndOfStream)
                 {
                     var line = await errReader.ReadLineAsync();
-                    Console.Error.WriteLine($"[Rust Error] {line}");
+                    Console.Error.WriteLine($"{line}");
                 }
             });
 
-            _pipeClient = new NamedPipeClientStream(".", pipeName, PipeDirection.InOut, System.IO.Pipes.PipeOptions.Asynchronous);
-            _pipeClient.Connect();
-
-            _reader = new StreamReader(_pipeClient);
-            _writer = new StreamWriter(_pipeClient) { AutoFlush = true };
+            _reader = _process.StandardOutput;
+            _writer = _process.StandardInput;
 
             Console.WriteLine("Connected to GM");
 
