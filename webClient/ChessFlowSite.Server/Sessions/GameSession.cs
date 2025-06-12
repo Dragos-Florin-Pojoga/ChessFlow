@@ -72,6 +72,7 @@ namespace ChessFlowSite.Server.Sessions
 
             _reader = _process.StandardOutput;
             _writer = _process.StandardInput;
+            _writer.AutoFlush = true;
 
             Console.WriteLine("Connected to GM");
 
@@ -182,66 +183,74 @@ namespace ChessFlowSite.Server.Sessions
                 var line = await _reader.ReadLineAsync();
                 if (line == null) break;
                 Console.WriteLine($"Received from GM:\n{line}");
-                using JsonDocument doc = JsonDocument.Parse(line);
-                var root = doc.RootElement;
-                string type = root.GetProperty("type").GetString();
-                Console.WriteLine(type);
-                if (type == "moveResult")
-                {
-                    string fen = root.GetProperty("fen").GetString();
-                    string turn = root.GetProperty("turn").GetString();
-                    int whiteTime = root.GetProperty("white_ms").GetInt32();
-                    int blackTime = root.GetProperty("black_ms").GetInt32();
-                    string lastMove = root.GetProperty("last_move").GetString();
-                    bool valid = root.GetProperty("is_valid").GetBoolean();
-                    string? moveHistory = null;
-                    if (root.TryGetProperty("move_history", out var moveHistoryElement) && moveHistoryElement.ValueKind == JsonValueKind.String)
+                try {
+                    using JsonDocument doc = JsonDocument.Parse(line);
+                    var root = doc.RootElement;
+                    string type = root.GetProperty("type").GetString();
+                    Console.WriteLine(type);
+                    if (type == "moveResult")
                     {
-                        moveHistory = moveHistoryElement.GetString();
+                        string fen = root.GetProperty("fen").GetString();
+                        string turn = root.GetProperty("turn").GetString();
+                        int whiteTime = root.GetProperty("white_ms").GetInt32();
+                        int blackTime = root.GetProperty("black_ms").GetInt32();
+                        string lastMove = root.GetProperty("last_move").GetString();
+                        bool valid = root.GetProperty("is_valid").GetBoolean();
+                        string? moveHistory = null;
+                        if (root.TryGetProperty("move_history", out var moveHistoryElement) && moveHistoryElement.ValueKind == JsonValueKind.String)
+                        {
+                            moveHistory = moveHistoryElement.GetString();
+                        }
+                        var payload = new
+                        {
+                            fen = fen,
+                            turn = turn,
+                            whiteTime = whiteTime,
+                            blackTime = blackTime,
+                            valid = valid,
+                            lastMove = lastMove,
+                            moveHistory = moveHistory
+                        };
+                        Console.WriteLine(payload);
+                        await Clients.Clients(PlayerWhite.ConnectionId).SendAsync("GameEvent", "MoveResult", payload);
+                        if (PlayerBlack != null)
+                        {
+                            await Clients.Clients(PlayerBlack!.ConnectionId).SendAsync("GameEvent", "MoveResult", payload);
+                        }
                     }
-                    var payload = new
+                    else if (type == "gameOver")
                     {
-                        fen = fen,
-                        turn = turn,
-                        whiteTime = whiteTime,
-                        blackTime = blackTime,
-                        valid = valid,
-                        lastMove = lastMove,
-                        moveHistory = moveHistory
-                    };
-                    Console.WriteLine(payload);
-                    await Clients.Clients(PlayerWhite.ConnectionId).SendAsync("GameEvent", "MoveResult", payload);
-                    if (PlayerBlack != null)
-                    {
-                        await Clients.Clients(PlayerBlack!.ConnectionId).SendAsync("GameEvent", "MoveResult", payload);
+                        string result = root.GetProperty("reason").GetString();
+                        string? winner = root.GetProperty("winner").GetString();
+                        int deltaEloWhite = root.GetProperty("white_elo_change").GetInt32();
+                        int deltaEloBlack = root.GetProperty("black_elo_change").GetInt32();
+                        string finalFen = root.GetProperty("fen").GetString();
+                        int moveCount = root.GetProperty("move_count").GetInt32();
+                        moveCount = (moveCount + 1) / 2;
+                        string PGN = AddPgnMoveNumbers(root.GetProperty("pgn").GetString());
+
+
+
+                        var payload = new
+                        {
+                            result = result,
+                            winner = winner,
+                            deltaEloWhite = deltaEloWhite,
+                            deltaEloBlack = deltaEloBlack
+                        };
+                        Console.WriteLine(payload);
+                        await _gameManager.EndGame(GameId, PlayerWhite, PlayerBlack, deltaEloWhite, deltaEloBlack, winner, result, moveCount, finalFen, PGN);
+                        await Clients.Clients(PlayerWhite.ConnectionId).SendAsync("GameEvent", "GameOver", payload);
+                        if (PlayerBlack != null)
+                        {
+                            await Clients.Clients(PlayerBlack!.ConnectionId).SendAsync("GameEvent", "GameOver", payload);
+                        }
                     }
                 }
-                else if (type == "gameOver") {
-                    string result = root.GetProperty("reason").GetString();
-                    string? winner = root.GetProperty("winner").GetString();
-                    int deltaEloWhite = root.GetProperty("white_elo_change").GetInt32();
-                    int deltaEloBlack = root.GetProperty("black_elo_change").GetInt32();
-                    string finalFen = root.GetProperty("fen").GetString();
-                    int moveCount = root.GetProperty("move_count").GetInt32();
-                    moveCount = (moveCount + 1) / 2;
-                    string PGN = AddPgnMoveNumbers(root.GetProperty("pgn").GetString());
-
-
-
-                    var payload = new
-                    {
-                        result = result,
-                        winner = winner,
-                        deltaEloWhite = deltaEloWhite,
-                        deltaEloBlack = deltaEloBlack
-                    };
-                    Console.WriteLine(payload);
-                    await _gameManager.EndGame(GameId, PlayerWhite, PlayerBlack, deltaEloWhite, deltaEloBlack, winner, result, moveCount, finalFen, PGN);
-                    await Clients.Clients(PlayerWhite.ConnectionId).SendAsync("GameEvent", "GameOver", payload);
-                    if (PlayerBlack != null)
-                    {
-                        await Clients.Clients(PlayerBlack!.ConnectionId).SendAsync("GameEvent", "GameOver", payload);
-                    }
+                catch (JsonException ex)
+                {
+                    Console.Error.WriteLine($"Error parsing JSON from {line}");
+                    continue;
                 }
             }
         }
