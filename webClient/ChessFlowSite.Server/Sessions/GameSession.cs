@@ -117,7 +117,8 @@ namespace ChessFlowSite.Server.Sessions
             Console.WriteLine(String.Format("{0} from {1}", move, clientColor));
             var makeMoveModel = new MakeMoveModel
             {
-                san_move = move
+                san_move = move,
+                player_color = clientColor
             };
             return SendAsync(makeMoveModel);
         }
@@ -293,6 +294,7 @@ namespace ChessFlowSite.Server.Sessions
     public class MakeMoveModel {
         public string type { get; set; } = "makeMove";
         public string san_move { get; set; }
+        public string player_color { get; set; }
     }
 
     public class ResignModel {
